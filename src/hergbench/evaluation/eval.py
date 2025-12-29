@@ -8,7 +8,9 @@ from typing import Callable, Dict, List, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from sklearn.calibration import CalibratedClassifierCV, calibration_curve
+from sklearn.calibration import calibration_curve
+from sklearn.isotonic import IsotonicRegression
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     average_precision_score,
     balanced_accuracy_score,
@@ -26,12 +28,37 @@ class CalibrationConfig:
 
 
 def calibrate_prefit(model, X_val: np.ndarray, y_val: np.ndarray, method: str):
-    """Calibrate a prefit model on validation data."""
+    """Calibrate a prefit model on validation data without refitting the base estimator."""
     if method not in {"isotonic", "sigmoid"}:
         raise ValueError(f"Unknown calibration method: {method}")
-    cal = CalibratedClassifierCV(model, method=method, cv="prefit")
-    cal.fit(X_val, y_val)
-    return cal
+
+    p_val = model.predict_proba(X_val)[:, 1]
+
+    if method == "isotonic":
+        calibrator = IsotonicRegression(out_of_bounds="clip")
+        calibrator.fit(p_val, y_val)
+    else:
+        calibrator = LogisticRegression(max_iter=1000)
+        calibrator.fit(p_val.reshape(-1, 1), y_val)
+
+    return PrefitCalibratedModel(model, calibrator, method)
+
+
+class PrefitCalibratedModel:
+    def __init__(self, base_model, fitted_calibrator, cal_method: str):
+        self.base_model = base_model
+        self.calibrator = fitted_calibrator
+        self.method = cal_method
+        self.classes_ = np.array([0, 1], dtype=int)
+
+    def predict_proba(self, X):
+        p = self.base_model.predict_proba(X)[:, 1]
+        if self.method == "isotonic":
+            p_cal = self.calibrator.transform(p)
+        else:
+            p_cal = self.calibrator.predict_proba(p.reshape(-1, 1))[:, 1]
+        p_cal = np.clip(p_cal, 0.0, 1.0)
+        return np.column_stack([1.0 - p_cal, p_cal])
 
 
 def select_threshold(y_true: np.ndarray, p: np.ndarray, metric: str) -> float:
@@ -71,11 +98,15 @@ def compute_metrics(y_true: np.ndarray, p: np.ndarray, threshold: float) -> Dict
     y_true = y_true.astype(int)
     y_hat = (p >= threshold).astype(int)
 
+    classes = np.unique(y_true)
+    binary = len(classes) == 2
+
+    # If only one class is present, classification metrics emit warnings; return nan for those.
     out = {
-        "auroc": float(roc_auc_score(y_true, p)) if len(np.unique(y_true)) == 2 else float("nan"),
-        "auprc": float(average_precision_score(y_true, p)) if len(np.unique(y_true)) == 2 else float("nan"),
-        "f1": float(f1_score(y_true, y_hat, zero_division=0)),
-        "balanced_acc": float(balanced_accuracy_score(y_true, y_hat)),
+        "auroc": float(roc_auc_score(y_true, p)) if binary else float("nan"),
+        "auprc": float(average_precision_score(y_true, p)) if binary else float("nan"),
+        "f1": float(f1_score(y_true, y_hat, zero_division=0)) if binary else float("nan"),
+        "balanced_acc": float(balanced_accuracy_score(y_true, y_hat)) if binary else float("nan"),
         "brier": float(brier_score_loss(y_true, p)),
     }
     return out

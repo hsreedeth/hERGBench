@@ -1,5 +1,5 @@
 [project]
-name = "hergbench"
+name = "hergbench-tdc"
 version = "0.1.0"
 description = "Actionable hERG benchmark: strong baselines, scaffold splits, counterfactual lead reports."
 requires-python = ">=3.11"
@@ -13,7 +13,7 @@ dependencies = [
   "optuna>=3.6",
   "matplotlib>=3.7",
   "plotly>=5.20",
-  "tdc>=0.1.0",
+  "PyTDC==0.4.1",
   "exmol>=3.3.0",
 ]
 

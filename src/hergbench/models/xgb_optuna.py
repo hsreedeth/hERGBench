@@ -56,6 +56,7 @@ def tune_xgb(
             n_jobs=-1,
             random_state=cfg.random_state,
             scale_pos_weight=scale_pos_weight,
+            early_stopping_rounds=cfg.early_stopping_rounds,
             **params,
         )
         model.fit(
@@ -63,7 +64,6 @@ def tune_xgb(
             y_train,
             eval_set=[(X_val, y_val)],
             verbose=False,
-            early_stopping_rounds=cfg.early_stopping_rounds,
         )
         p_val = model.predict_proba(X_val)[:, 1]
         return _score(y_val, p_val, cfg.objective)
@@ -95,6 +95,7 @@ def fit_xgb(
         n_jobs=-1,
         random_state=cfg.random_state,
         scale_pos_weight=scale_pos_weight,
+        early_stopping_rounds=cfg.early_stopping_rounds,
         **params,
     )
     model.fit(
@@ -102,6 +103,5 @@ def fit_xgb(
         y_train,
         eval_set=[(X_val, y_val)],
         verbose=False,
-        early_stopping_rounds=cfg.early_stopping_rounds,
     )
     return model
