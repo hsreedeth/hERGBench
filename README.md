@@ -1,6 +1,6 @@
 
 <div align="center">
-  <img src="https://i.postimg.cc/8PBt9zYM/h-ERGCOver.jpg" alt = "project hERG cover image" />
+  <img src="https://i.postimg.cc/yNS9qfdN/h-ERGCOver.jpg" alt = "project hERG cover image" />
 </div>
 
 
