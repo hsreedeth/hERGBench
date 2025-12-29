@@ -1,1 +1,25 @@
+
+# pyhton
+__pycache__/
+*.pyc 
+.ipynb_checkpoints/
+.venv/
+.env
+
+# Conda
+*.conda
+*.conda-lock
+
+# data related.
+data/raw
+data/processed
+reports/runs
+reports/lead_reports
+
+
+# OS
 .DS_Store
+
+# General Logs. (refer to)
+notes.txt
+explanation_tutorial_notes.txt
