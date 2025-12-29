@@ -1,7 +1,8 @@
-# base configuration for reproducible runs.
+# Stage 1 MVP (baseline-only) with triple split types and medicinal-chemist counterfactual filter
+# Adjust paths if your repo differs.
 project:
   project_name: "hergbench"
-  run_name: "stage0_smoke_test"
+  run_name: "stage1_mvp"
 
 repro:
   seed: 42
@@ -16,7 +17,6 @@ paths:
 logging:
   level: "INFO"
 
-# # patch 0.1
 stage1:
   dataset:
     tdc_task: "Tox"
@@ -24,50 +24,37 @@ stage1:
     smiles_col: "Drug"
     label_col: "Y"
 
-  # we will implement our own Bemis–Murcko scaffold split
-  # per protocol (types)
-  # Tanimoto similarity cutoff for Butina
   splits:
-    types: ["random", "scaffold", "cluster"]   
+    types: ["random", "scaffold", "cluster"]   # per protocol
     frac_train: 0.80
     frac_val: 0.10
     frac_test: 0.10
     seeds: [11, 22, 33, 44, 55]
-    butina_cutoff: 0.60        
+    butina_cutoff: 0.60        # Tanimoto similarity cutoff for Butina
     force_resplit: false
 
-  # ECFP4.
   features:
     radius: 2
     n_bits: 2048
 
-  # good default for class imbalance
   model:
+    objective: "aucpr"
     optuna_trials: 75
-    objective: "aucpr"    
-    direction: "maximize"
     early_stopping_rounds: 50
     max_estimators: 4000
 
-  # method: or "sigmoid" (Platt)
-  # threshold_metric: or "f1"
   calibration:
-    method: "isotonic"     
-    threshold_metric: "youden"  
+    method: "isotonic"         # "sigmoid" for Platt
+    threshold_metric: "youden" # or "f1"
     n_bins: 10
 
-  # similarity-to-train bins
   eval:
     bootstrap_B: 2000
-    bins: [0.3, 0.5, 0.7]  
+    bins: [0.3, 0.5, 0.7]
 
-  # nmols: how many to return per molecule
-  # max_targets: number of molecules to generate lead reports for
-  # high_risk_p or "high_risk"
-  # selection: per protocol - perturb high-risk predictions
   counterfactuals:
     enable: true
-    selection: "high_risk"     
+    selection: "high_risk"     # per protocol: perturb high-risk predictions
     high_risk_p: 0.7
     safe_p: 0.3
     exmol_preset: "medium"
@@ -79,10 +66,3 @@ stage1:
       logp_delta_max: 1.5
       qed_min: 0.0
       pains: true
-
-
-
-
-
-
-

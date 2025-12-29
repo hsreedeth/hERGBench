@@ -14,6 +14,7 @@ dependencies = [
   "matplotlib>=3.7",
   "plotly>=5.20",
   "tdc>=0.1.0",
+  "exmol>=3.3.0",
 ]
 
 [project.optional-dependencies]
