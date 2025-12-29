@@ -2,6 +2,7 @@ README.md
 pyproject.toml
 src/hergbench/__init__.py
 src/hergbench/cli.py
+src/hergbench/stage1_pipeline.py
 src/hergbench.egg-info/PKG-INFO
 src/hergbench.egg-info/SOURCES.txt
 src/hergbench.egg-info/dependency_links.txt
@@ -9,11 +10,19 @@ src/hergbench.egg-info/entry_points.txt
 src/hergbench.egg-info/requires.txt
 src/hergbench.egg-info/top_level.txt
 src/hergbench/data/__init__.py
+src/hergbench/data/herg_dataset.py
+src/hergbench/data/splits.py
+src/hergbench/data/standardize.py
 src/hergbench/data/tdc_fetch.py
 src/hergbench/evaluation/__init__.py
+src/hergbench/evaluation/eval.py
 src/hergbench/features/__init__.py
+src/hergbench/features/fingerprints.py
 src/hergbench/models/__init__.py
+src/hergbench/models/xgb_optuna.py
 src/hergbench/reporting/__init__.py
+src/hergbench/reporting/lead_opt.py
+src/hergbench/reporting/sascorer.py
 src/hergbench/utils/__init__.py
 src/hergbench/utils/config.py
 src/hergbench/utils/logging.py

@@ -13,7 +13,7 @@ Requires-Dist: optuna>=3.6
 Requires-Dist: matplotlib>=3.7
 Requires-Dist: plotly>=5.20
 Requires-Dist: tdc>=0.1.0
-Requires-Dist: exmol
+Requires-Dist: exmol>=3.3.0
 Provides-Extra: dev
 Requires-Dist: ruff>=0.5; extra == "dev"
 Requires-Dist: pre-commit>=3.7; extra == "dev"
