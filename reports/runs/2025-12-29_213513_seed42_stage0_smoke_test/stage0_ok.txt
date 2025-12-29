@@ -1,0 +1,1 @@
+Stage 0 completed. Repo skeleton + reproducibility logging are operational.
