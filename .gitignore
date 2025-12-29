@@ -13,7 +13,7 @@ __pycache__/
 # data related.
 data/raw
 data/processed
-# reports/runs
+reports/runs
 reports/lead_reports
 
 # OS
