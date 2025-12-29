@@ -1,0 +1,37 @@
+hERGBench directory map
+
+hERGBench/
+- README.md - project overview
+- Makefile - shortcuts for run and lint
+- pyproject.toml - package metadata and deps
+- configs/
+  - base.yaml - stage0 smoke config
+- data/
+  - raw/ - raw inputs staging
+  - processed/ - processed artifacts
+  - splits/ - prepared data splits
+- reports/
+  - runs/ - run outputs and logs
+    - 2025-12-29_212447_seed42_stage0_smoke_test/ - stage0 log only
+    - 2025-12-29_212551_seed42_stage0_smoke_test/ - stage0 artifacts
+    - 2025-12-29_213513_seed42_stage0_smoke_test/ - stage0 artifacts
+  - figures/ - plotting space
+  - lead_reports/ - lead report space
+  - tables/ - table outputs
+- src/
+  - hergbench/ - package code
+    - cli.py - Typer entry point for stage0 run
+    - data/tdc_fetch.py - TDC fetch helper
+    - utils/config.py - YAML config loader
+    - utils/logging.py - run logging and metadata writer
+    - utils/repro.py - reproducibility helpers
+    - evaluation/ - evaluation stub
+    - features/ - feature engineering stub
+    - models/ - model code stub
+    - reporting/ - reporting stub
+  - hergbench.egg-info/ - build metadata
+- hergbench.egg-info/ - install metadata
+- notes.txt - scratch notes
+- gitcomms.txt - commit message drafts
+- explanation_tutorial_notes.txt - tutorial notes
+- .gitignore - git ignore rules
