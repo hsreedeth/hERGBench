@@ -1,0 +1,22 @@
+# base configuration for reproducible runs.
+project:
+  project_name: "hergbench"
+  run_name: "stage0_smoke_test"
+
+repro:
+  seed: 42
+
+paths:
+  data_raw: "data/raw"
+  data_processed: "data/processed"
+  data_splits: "data/splits"
+  reports_root: "reports"
+  runs_root: "reports/runs"
+
+# resolved in later stages, kept here for wiring.
+tdc:
+  dataset_group: "admet"
+  dataset_name: "herg"
+
+logging:
+  level: "INFO"
