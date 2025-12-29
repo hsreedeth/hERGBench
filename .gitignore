@@ -1,5 +1,5 @@
 
-# pyhton
+# python
 __pycache__/
 *.pyc 
 .ipynb_checkpoints/
@@ -16,10 +16,10 @@ data/processed
 reports/runs
 reports/lead_reports
 
-
 # OS
 .DS_Store
 
-# General Logs. (refer to)
+# General Logs. (refer to obsidian notes for detailed breakdowns.)
 notes.txt
 explanation_tutorial_notes.txt
+gitcomms.txt
