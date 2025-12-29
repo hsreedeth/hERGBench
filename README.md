@@ -1,3 +1,5 @@
+<img src = "https://i.postimg.cc/8PBt9zYM/h-ERGCOver.jpg" alt = ""project hERG cover image/>
+
 # hERG Bench
 ---
 
