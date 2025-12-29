@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+hergbench.egg-info/PKG-INFO
+hergbench.egg-info/SOURCES.txt
+hergbench.egg-info/dependency_links.txt
+hergbench.egg-info/entry_points.txt
+hergbench.egg-info/requires.txt
+hergbench.egg-info/top_level.txt
