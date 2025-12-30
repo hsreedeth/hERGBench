@@ -23,6 +23,14 @@ def _candidate_paths() -> list[Path]:
     env = os.environ.get("HERGBENCH_FPSCORES")
     if env:
         paths.append(Path(env))
+    # RDKit wheel install location
+    try:
+        import rdkit  # type: ignore
+
+        rdkit_root = Path(rdkit.__file__).resolve().parent.parent
+        paths.append(rdkit_root / "Contrib" / "SA_Score" / "fpscores.pkl.gz")
+    except Exception:
+        pass
     # common conda locations
     conda = os.environ.get("CONDA_PREFIX")
     if conda:
@@ -38,7 +46,12 @@ def ensure_fpscores(cache_dir: Path) -> Path:
     cache_dir.mkdir(parents=True, exist_ok=True)
     dst = cache_dir / "fpscores.pkl.gz"
     if dst.exists():
-        return dst
+        # Validate existing file; if unreadable, refresh.
+        try:
+            _load_fragment_scores(str(dst))
+            return dst
+        except Exception:
+            dst.unlink(missing_ok=True)
 
     # Try system/conda locations first
     for p in _candidate_paths():
@@ -56,11 +69,27 @@ def _load_fragment_scores(fpscores_path: str) -> Dict[int, float]:
     p = Path(fpscores_path)
     with gzip.open(str(p), "rb") as f:
         data = pickle.load(f)
-    # data is list of (fragment_id, score)
+    # data is typically list of (fragment_id, score)
     out: Dict[int, float] = {}
-    for frag_id, score in data:
-        out[int(frag_id)] = float(score)
-    return out
+    if isinstance(data, dict):
+        return {int(k): float(v) for k, v in data.items()}
+    if isinstance(data, list) and data:
+        sample = data[0]
+        # Standard format: list of 2-tuples/lists
+        if isinstance(sample, (tuple, list)) and len(sample) == 2 and not isinstance(sample[0], (list, tuple)):
+            for frag_id, score in data:  # type: ignore
+                out[int(frag_id)] = float(score)
+            return out
+        # Some builds ship scores as a list (or list of lists) of floats; map by index
+        try:
+            if isinstance(sample, (list, tuple)):
+                out = {i: float(row[0]) for i, row in enumerate(data)}  # type: ignore
+            else:
+                out = {i: float(v) for i, v in enumerate(data)}  # type: ignore
+            return out
+        except Exception:
+            pass
+    raise ValueError(f"Unrecognized fpscores format at {fpscores_path}")
 
 
 def calculate_sa_score(mol: Chem.Mol, fpscores_path: Optional[Path] = None, cache_dir: Optional[Path] = None) -> float:

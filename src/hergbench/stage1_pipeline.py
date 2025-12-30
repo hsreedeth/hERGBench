@@ -148,6 +148,8 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
     high_risk_p = float(cf_cfg_raw.get("high_risk_p", 0.7))
     safe_p = float(cf_cfg_raw.get("safe_p", 0.3))
     exmol_preset = str(cf_cfg_raw.get("exmol_preset", "medium"))
+    cf_search_nmols = int(cf_cfg_raw.get("search_nmols", 250))
+    cf_delta_min = float(cf_cfg_raw.get("delta_min", 0.10))
 
     constraints = CFConstraints(
         min_tanimoto=float(cf_cfg_raw.get("constraints", {}).get("min_tanimoto", 0.7)),
@@ -177,12 +179,12 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
     all_rows: List[Dict[str, Any]] = []
     pooled_reliability = {}  # split_type -> (y, p)
 
-    # Track candidates for lead reports across runs (hardest split first later)
-    lead_candidates: List[Dict[str, Any]] = []
-
     for split_type in split_types:
         for seed in seeds:
             logger.info("Stage1: split=%s seed=%d", split_type, seed)
+            cal_method = "sigmoid" if split_type == "cluster" else cal_cfg.method
+            if split_type == "cluster" and cal_cfg.method != "sigmoid":
+                logger.info("Using sigmoid calibration for cluster split to reduce overfitting risk.")
 
             split_csv = get_or_create_split(
                 df=df,
@@ -210,7 +212,7 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
             model = fit_xgb(X_tr, y_tr, X_va, y_va, params=best_params, cfg=xgb_cfg, scale_pos_weight=spw)
 
             # Calibrate + threshold on validation
-            cal_model = calibrate_prefit(model, X_va, y_va, method=cal_cfg.method)
+            cal_model = calibrate_prefit(model, X_va, y_va, method=cal_method)
             p_va = cal_model.predict_proba(X_va)[:, 1]
             threshold = select_threshold(y_va, p_va, metric=cal_cfg.threshold_metric)
 
@@ -261,14 +263,6 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
             pooled["y"].extend(y_te.tolist())
             pooled["p"].extend(p_te.tolist())
 
-            # Collect lead candidates (prefer hard split later)
-            if cf_enable and split_type == "cluster":
-                for mol_id, smi, y, p in zip(df_pred["mol_id"], df_pred["smiles"], df_pred["y"], df_pred["p_cal"]):
-                    if cf_selection == "high_risk" and p >= high_risk_p:
-                        lead_candidates.append(
-                            {"mol_id": mol_id, "smiles": smi, "y": int(y), "p_cal": float(p), "threshold": float(threshold)}
-                        )
-
             # Persist model params for audit
             model_meta = {
                 "split_type": split_type,
@@ -276,7 +270,11 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                 "best_val_score": float(best_val),
                 "best_params": best_params,
                 "scale_pos_weight": float(spw),
-                "calibration": {"method": cal_cfg.method, "threshold_metric": cal_cfg.threshold_metric, "threshold": float(threshold)},
+                "calibration": {
+                    "method": cal_method,
+                    "threshold_metric": cal_cfg.threshold_metric,
+                    "threshold": float(threshold),
+                },
             }
             (models_dir / f"model_meta_{split_type}_seed{seed}.json").write_text(json.dumps(model_meta, indent=2), encoding="utf-8")
 
@@ -347,86 +345,116 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
     df_app.to_csv(out_app, index=False)
     logger.info("Wrote %s", out_app)
 
-    # Lead reports (cluster / high-risk)
-    if cf_enable and lead_candidates:
-        # Dedupe by mol_id, then pick top-N by risk
-        seen = set()
-        uniq = []
-        for r in sorted(lead_candidates, key=lambda r: r["p_cal"], reverse=True):
-            mid = str(r["mol_id"])
-            if mid in seen:
-                continue
-            seen.add(mid)
-            uniq.append(r)
-        lead_candidates = uniq[:cf_max_targets]
-
-        # Load the persisted calibrated model from the first cluster seed (auditable + deterministic)
+    # Lead reports (cluster; consistent seed/model)
+    if cf_enable:
         seed0 = int(seeds[0])
-        bundle = joblib.load(models_dir / f"model_cluster_seed{seed0}.joblib")
-        cal_model = bundle["cal_model"]
-        threshold = float(bundle["threshold"])
 
-        def prob_fn(smiles: str) -> float:
-            # single-smiles model evaluation via fingerprint
-            from rdkit import Chem
-            from hergbench.features.fingerprints import mol_to_ecfp_bits, fps_to_numpy
+        pred_path0 = preds_dir / f"test_preds_cluster_seed{seed0}.csv"
+        split_csv0 = Path(cfg["paths"]["data_splits"]) / f"cluster_seed{seed0}.csv"
+        model_path0 = models_dir / f"model_cluster_seed{seed0}.joblib"
 
-            m = Chem.MolFromSmiles(smiles)
-            if m is None:
-                return 0.0
-            fp = mol_to_ecfp_bits(m, fp_cfg)
-            X = fps_to_numpy([fp])
-            return float(cal_model.predict_proba(X)[:, 1][0])
+        if pred_path0.exists() and split_csv0.exists() and model_path0.exists():
+            df_pred0 = pd.read_csv(pred_path0)
 
-        def class_fn(smiles: str) -> int:
-            return int(prob_fn(smiles) >= 0.5)
+            # Load calibrated model bundle
+            bundle = joblib.load(model_path0)
+            cal_model = bundle["cal_model"]
+            threshold = float(bundle["threshold"])
 
-        # Similarity-to-train for warnings
-        tr_idx = [idx_map[i] for i in train_df["mol_id"].astype(str).tolist()]
-        train_fps = [fps_all[i] for i in tr_idx]
+            # Train fingerprints for similarity warnings (from the same split)
+            train_df0, _, _ = split_df(df, split_csv0)
+            tr_idx0 = [idx_map[i] for i in train_df0["mol_id"].astype(str).tolist()]
+            train_fps0 = [fps_all[i] for i in tr_idx0]
 
-        for i, cand in enumerate(lead_candidates, start=1):
-            mol_id = str(cand["mol_id"])
-            smi = str(cand["smiles"])
-            y = int(cand["y"])
-            p_cal = float(prob_fn(smi))
+            # Candidate selection
+            lead_candidates: List[Dict[str, Any]] = []
+            for mol_id, smi, y, p, y_pred in zip(
+                df_pred0["mol_id"], df_pred0["smiles"], df_pred0["y"], df_pred0["p_cal"], df_pred0["y_pred"]
+            ):
+                y = int(y)
+                p = float(p)
+                y_pred = int(y_pred)
 
-            # max similarity for bin warning
-            from rdkit import Chem
-            mol = Chem.MolFromSmiles(smi)
-            if mol is None:
-                continue
-            fp = mol_to_ecfp_bits(mol, fp_cfg)
-            max_sim = float(max(DataStructs.BulkTanimotoSimilarity(fp, train_fps))) if train_fps else 0.0
-            sim_bin = _bin_similarity(max_sim, eval_bins)
+                if cf_selection == "high_risk" and p >= high_risk_p:
+                    lead_candidates.append({"mol_id": str(mol_id), "smiles": str(smi), "y": y, "p": p})
+                elif cf_selection == "false_positives" and (y == 0) and (y_pred == 1):
+                    lead_candidates.append({"mol_id": str(mol_id), "smiles": str(smi), "y": y, "p": p})
 
-            try:
-                cfs = generate_counterfactuals_exmol(
-                    base_smiles=smi,
-                    model_class=class_fn,
-                    model_prob=prob_fn,
-                    fp_cfg=fp_cfg,
-                    constraints=constraints,
-                    safe_prob_max=safe_p,
-                    exmol_preset=exmol_preset,
-                    nmols=cf_nmols,
+            if not lead_candidates and cf_selection == "high_risk":
+                # Fallback: take top cf_max_targets by predicted risk for lead optimization
+                df_sorted = df_pred0.sort_values("p_cal", ascending=False).head(cf_max_targets)
+                lead_candidates = [
+                    {"mol_id": str(r["mol_id"]), "smiles": str(r["smiles"]), "y": int(r["y"]), "p": float(r["p_cal"])}
+                    for _, r in df_sorted.iterrows()
+                ]
+                logger.info(
+                    "No cluster candidates met high_risk_p=%.2f; falling back to top %d by p_cal (max=%.3f).",
+                    high_risk_p,
+                    cf_max_targets,
+                    float(df_sorted["p_cal"].max()) if not df_sorted.empty else 0.0,
                 )
-            except Exception as e:
-                logger.warning("Counterfactual generation failed for %s: %s", mol_id, e)
-                cfs = []
 
-            report_dir = lead_dir / f"{mol_id}"
-            write_lead_report(
-                out_dir=report_dir,
-                mol_id=mol_id,
-                base_smiles=smi,
-                y_true=y,
-                p_cal=p_cal,
-                threshold=threshold,
-                max_sim=max_sim,
-                sim_bin=sim_bin,
-                counterfactuals=cfs,
-            )
-            logger.info("Lead report %d/%d written: %s", i, len(lead_candidates), report_dir)
+            lead_candidates = lead_candidates[:cf_max_targets]
+
+            def prob_fn(smiles: str) -> float:
+                from rdkit import Chem
+                m = Chem.MolFromSmiles(smiles)
+                if m is None:
+                    return 0.0
+                fp = mol_to_ecfp_bits(m, fp_cfg)
+                X = fps_to_numpy([fp])
+                return float(cal_model.predict_proba(X)[:, 1][0])
+
+            def class_fn(smiles: str) -> int:
+                return int(prob_fn(smiles) >= threshold)
+
+            for i, cand in enumerate(lead_candidates, start=1):
+                mol_id = cand["mol_id"]
+                smi = cand["smiles"]
+                y = int(cand["y"])
+                p_cal = float(prob_fn(smi))
+
+                from rdkit import Chem
+                mol = Chem.MolFromSmiles(smi)
+                if mol is None:
+                    continue
+                fp = mol_to_ecfp_bits(mol, fp_cfg)
+                max_sim = float(max(DataStructs.BulkTanimotoSimilarity(fp, train_fps0))) if train_fps0 else 0.0
+                sim_bin = _bin_similarity(max_sim, eval_bins)
+
+                try:
+                    flip_prob_max = max(0.0, threshold - 1e-6)
+                    cfs, cf_diag = generate_counterfactuals_exmol(
+                        base_smiles=smi,
+                        model_class=class_fn,
+                        model_prob=prob_fn,
+                        fp_cfg=fp_cfg,
+                        constraints=constraints,
+                        safe_prob_max=flip_prob_max,
+                        exmol_preset=exmol_preset,
+                        nmols=cf_nmols,
+                        search_nmols=cf_search_nmols,
+                        delta_min=cf_delta_min,
+                        logger=logger,
+                    )
+                except Exception:
+                    logger.exception("Counterfactual generation failed for %s", mol_id)
+                    cfs = []
+                    cf_diag = None
+
+                report_dir = lead_dir / mol_id
+                write_lead_report(
+                    out_dir=report_dir,
+                    mol_id=mol_id,
+                    base_smiles=smi,
+                    y_true=y,
+                    p_cal=p_cal,
+                    threshold=threshold,
+                    max_sim=max_sim,
+                    sim_bin=sim_bin,
+                    counterfactuals=cfs,
+                    cf_summary=cf_diag,
+                )
+                logger.info("Lead report %d/%d written: %s", i, len(lead_candidates), report_dir)
 
     logger.info("Stage 1 completed.")

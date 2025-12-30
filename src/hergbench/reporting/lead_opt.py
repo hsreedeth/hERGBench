@@ -96,8 +96,11 @@ def generate_counterfactuals_exmol(
     safe_prob_max: float = 0.3,
     exmol_preset: str = "medium",
     nmols: int = 5,
+    search_nmols: int = 250,
+    delta_min: float = 0.10,
     fpscores_cache_dir: Optional[Path] = None,
-) -> List[Dict[str, Any]]:
+    logger: Optional[Any] = None,
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """Generate and filter counterfactuals around base_smiles using ExMol + medicinal-chemist filters.
 
     Returns a ranked list of dicts with smiles, similarity, p, delta_p, logp, qed, sascore, alert.
@@ -107,71 +110,191 @@ def generate_counterfactuals_exmol(
     p_base = float(model_prob(base_smiles))
     mol_base = Chem.MolFromSmiles(base_smiles)
     if mol_base is None:
-        return []
+        return [], {"error": "invalid_base_smiles"}
 
     base_props = mol_props(mol_base, cache_dir=fpscores_cache_dir)
     fp_base = mol_to_ecfp_bits(mol_base, fp_cfg)
 
     # ExMol expects a classifier f(smiles)->0/1 for counterfactual search.
-    space = exmol.sample_space(base_smiles, model_class, batched=False, preset=exmol_preset)
+    space = exmol.sample_space(
+        base_smiles,
+        model_class,
+        batched=False,
+        preset=exmol_preset,
+        use_selfies=False,
+        quiet=True,
+        method_kwargs=None,
+    )
+    if isinstance(space, tuple):
+        space = space[0]
 
-    # counterfactual search
-    cfs = exmol.cf_explain(space, nmols=nmols, filter_nondrug=False)
+    # counterfactual search (large pool)
+    cfs = exmol.cf_explain(space, nmols=search_nmols, filter_nondrug=False)
+    if isinstance(cfs, tuple):
+        cfs = cfs[0]
 
-    rows: List[Dict[str, Any]] = []
-    for ex in cfs:
-        smi = getattr(ex, "smiles", None)
-        if not smi or smi == base_smiles:
-            continue
-        mol = Chem.MolFromSmiles(smi)
-        if mol is None:
-            continue
-        try:
-            Chem.SanitizeMol(mol)
-        except Exception:
-            continue
+    def _filter_candidates(
+        min_tanimoto: float,
+        prob_max: Optional[float],
+        logp_delta_max: float,
+        sa_max: float,
+        require_delta: bool,
+        delta_min: float,
+        mode: str,
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
+        counts = {
+            "n_total": 0,
+            "n_invalid": 0,
+            "n_sim": 0,
+            "n_prob": 0,
+            "n_sa": 0,
+            "n_logp": 0,
+            "n_qed": 0,
+            "n_alert": 0,
+            "n_delta": 0,
+        }
+        rows: List[Dict[str, Any]] = []
+        for ex in cfs:
+            counts["n_total"] += 1
+            smi = getattr(ex, "smiles", None)
+            if not smi or smi == base_smiles:
+                counts["n_invalid"] += 1
+                continue
+            mol = Chem.MolFromSmiles(smi)
+            if mol is None:
+                counts["n_invalid"] += 1
+                continue
+            try:
+                Chem.SanitizeMol(mol)
+            except Exception:
+                counts["n_invalid"] += 1
+                continue
 
-        fp = mol_to_ecfp_bits(mol, fp_cfg)
-        sim = float(DataStructs.TanimotoSimilarity(fp_base, fp))
-        if sim < constraints.min_tanimoto:
-            continue
+            fp = mol_to_ecfp_bits(mol, fp_cfg)
+            sim = float(DataStructs.TanimotoSimilarity(fp_base, fp))
+            if sim < min_tanimoto:
+                counts["n_sim"] += 1
+                continue
 
-        p = float(model_prob(smi))
-        if p > safe_prob_max:
-            continue
+            p = float(model_prob(smi))
+            delta_p = p_base - p
+            if prob_max is not None and p > prob_max:
+                counts["n_prob"] += 1
+                continue
+            if require_delta and delta_p < delta_min:
+                counts["n_delta"] += 1
+                continue
 
-        props = mol_props(mol, cache_dir=fpscores_cache_dir)
-        if props["sascore"] > constraints.sa_max:
-            continue
+            props = mol_props(mol, cache_dir=fpscores_cache_dir)
+            if props["sascore"] > sa_max:
+                counts["n_sa"] += 1
+                continue
 
-        if abs(props["logp"] - base_props["logp"]) > constraints.logp_delta_max:
-            continue
+            if abs(props["logp"] - base_props["logp"]) > logp_delta_max:
+                counts["n_logp"] += 1
+                continue
 
-        if constraints.qed_min > 0 and props["qed"] < constraints.qed_min:
-            continue
+            if constraints.qed_min > 0 and props["qed"] < constraints.qed_min:
+                counts["n_qed"] += 1
+                continue
 
-        alert = has_structural_alerts(mol) if constraints.pains else False
-        if alert:
-            continue
+            alert = has_structural_alerts(mol) if constraints.pains else False
+            if alert:
+                counts["n_alert"] += 1
+                continue
 
-        rows.append(
-            {
-                "smiles": smi,
-                "similarity": sim,
-                "p": p,
-                "delta_p": p_base - p,
-                "logp": props["logp"],
-                "qed": props["qed"],
-                "sascore": props["sascore"],
-                "alert": alert,
-            }
+            rows.append(
+                {
+                    "smiles": smi,
+                    "similarity": sim,
+                    "p": p,
+                    "delta_p": delta_p,
+                    "logp": props["logp"],
+                    "qed": props["qed"],
+                    "sascore": props["sascore"],
+                    "alert": alert,
+                    "mode": mode,
+                }
+            )
+        counts["n_final"] = len(rows)
+        return rows, counts
+
+    attempts: List[Dict[str, Any]] = []
+
+    # Tier A: strict flip
+    rows, counts = _filter_candidates(
+        min_tanimoto=constraints.min_tanimoto,
+        prob_max=safe_prob_max,
+        logp_delta_max=constraints.logp_delta_max,
+        sa_max=constraints.sa_max,
+        require_delta=False,
+        delta_min=0.0,
+        mode="flip",
+    )
+    attempts.append({"tier": "strict", "counts": counts})
+    if logger:
+        logger.info("CF filtering (strict): %s", counts)
+
+    # Tier B: relaxed filters but still require flip (p <= target)
+    if not rows:
+        rows, counts = _filter_candidates(
+            min_tanimoto=max(0.55, constraints.min_tanimoto - 0.10),
+            prob_max=safe_prob_max,
+            logp_delta_max=constraints.logp_delta_max + 0.75,
+            sa_max=constraints.sa_max + 0.5,
+            require_delta=False,
+            delta_min=0.0,
+            mode="flip",
         )
+        attempts.append({"tier": "relaxed_flip", "counts": counts})
+        if logger:
+            logger.info("CF filtering (relaxed flip): %s", counts)
+
+    # Tier C: risk reduction (relaxed filters, require delta_p >= delta_min)
+    if not rows:
+        rows, counts = _filter_candidates(
+            min_tanimoto=max(0.55, constraints.min_tanimoto - 0.10),
+            prob_max=None,  # allow above threshold but require risk reduction
+            logp_delta_max=constraints.logp_delta_max + 0.75,
+            sa_max=constraints.sa_max + 0.5,
+            require_delta=True,
+            delta_min=delta_min,
+            mode="risk_reduction",
+        )
+        attempts.append({"tier": "risk_reduction", "counts": counts})
+        if logger:
+            logger.info("CF filtering (risk reduction): %s", counts)
+
+    # Final fallback: any chem-valid candidates ranked by delta_p
+    weak_rows: List[Dict[str, Any]] = []
+    if not rows:
+        weak_rows, weak_counts = _filter_candidates(
+            min_tanimoto=max(0.55, constraints.min_tanimoto - 0.10),
+            prob_max=None,
+            logp_delta_max=constraints.logp_delta_max + 0.75,
+            sa_max=constraints.sa_max + 0.5,
+            require_delta=False,
+            delta_min=0.0,
+            mode="weak_reduction",
+        )
+        attempts.append({"tier": "weak_reduction", "counts": weak_counts})
+        if logger:
+            logger.info("CF filtering (weak reduction): %s", weak_counts)
+        rows = weak_rows
 
     rows = _dedupe_by_smiles(rows)
 
     # rank: high sim, high risk drop; simple linear score
     rows.sort(key=lambda r: (r["delta_p"], r["similarity"]), reverse=True)
-    return rows[:nmols]
+    rows = rows[:nmols]
+
+    diag = {
+        "target_prob_max": float(safe_prob_max),
+        "attempts": attempts,
+        "final_tier": attempts[-1]["tier"] if attempts else "none",
+        "final_count": len(rows),
+    }
+    return rows, diag
 
 
 def write_lead_report(
@@ -184,6 +307,7 @@ def write_lead_report(
     max_sim: float,
     sim_bin: str,
     counterfactuals: List[Dict[str, Any]],
+    cf_summary: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Write a single-molecule lead optimization report as Markdown + PNG images."""
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -207,17 +331,29 @@ def write_lead_report(
     if not counterfactuals:
         md.append("_No valid counterfactuals found under current constraints._\n")
     else:
-        md.append("| Rank | Image | Similarity | p(toxic) | Δp | LogP | QED | SA | |\n")
-        md.append("|---:|:---:|---:|---:|---:|---:|---:|---:|:--|\n")
+        md.append("| Rank | Image | Similarity | p(toxic) | Δp | LogP | QED | SA | Mode |\n")
+        md.append("|---:|:---:|---:|---:|---:|---:|---:|---:|---|\n")
         for i, cf in enumerate(counterfactuals, start=1):
             img = f"cf_{i:02d}.png"
             md.append(
                 f"| {i} | ![]({img}) | {cf['similarity']:.3f} | {cf['p']:.3f} | {cf['delta_p']:.3f} | "
-                f"{cf['logp']:.2f} | {cf['qed']:.2f} | {cf['sascore']:.2f} | |\n"
+                f"{cf['logp']:.2f} | {cf['qed']:.2f} | {cf['sascore']:.2f} | {cf.get('mode','')} |\n"
             )
         md.append("\n### Raw counterfactual records\n")
         md.append("```json\n")
         md.append(json.dumps(counterfactuals, indent=2))
         md.append("\n```\n")
+
+    md.append("\n## CF generation summary\n")
+    if cf_summary:
+        md.append(f"- Target prob max: {cf_summary.get('target_prob_max', 'n/a')}\n")
+        md.append(f"- Final tier: {cf_summary.get('final_tier', 'n/a')} (kept {cf_summary.get('final_count', 0)})\n")
+        attempts = cf_summary.get("attempts", [])
+        if attempts:
+            md.append("- Filter counts by tier:\n")
+            for a in attempts:
+                md.append(f"  - {a.get('tier')}: {a.get('counts')}\n")
+    else:
+        md.append("- No CF diagnostics available.\n")
 
     (out_dir / "report.md").write_text("".join(md), encoding="utf-8")

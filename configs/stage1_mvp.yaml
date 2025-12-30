@@ -25,7 +25,7 @@ stage1:
     label_col: "Y"
 
   splits:
-    types: ["random", "scaffold", "cluster"]   # per protocol
+    types: ["random", "scaffold", "cluster"]   # per protocol, temporarily set to clust only. change back after cftest.
     frac_train: 0.80
     frac_val: 0.10
     frac_test: 0.10

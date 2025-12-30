@@ -148,12 +148,25 @@ def plot_reliability(
     out_path.parent.mkdir(parents=True, exist_ok=True)
     frac_pos, mean_pred = calibration_curve(y_true, p, n_bins=n_bins, strategy="uniform")
 
-    plt.figure()
-    plt.plot([0, 1], [0, 1])
-    plt.plot(mean_pred, frac_pos, marker="o")
-    plt.xlabel("Mean predicted probability")
-    plt.ylabel("Fraction of positives")
-    plt.title(title)
+    # Bin counts to show support behind each point
+    bins = np.linspace(0.0, 1.0, n_bins + 1)
+    counts, _ = np.histogram(p, bins=bins)
+    centers = 0.5 * (bins[:-1] + bins[1:])
+
+    fig, (ax_curve, ax_hist) = plt.subplots(
+        2, 1, figsize=(6, 6), sharex=True, gridspec_kw={"height_ratios": [3, 1]}
+    )
+
+    ax_curve.plot([0, 1], [0, 1], color="gray", linestyle="--", linewidth=1)
+    ax_curve.plot(mean_pred, frac_pos, marker="o")
+    ax_curve.set_ylabel("Fraction of positives")
+    ax_curve.set_title(title)
+
+    bar_widths = np.diff(bins)
+    ax_hist.bar(centers, counts, width=bar_widths, align="center", alpha=0.7)
+    ax_hist.set_ylabel("Count")
+    ax_hist.set_xlabel("Mean predicted probability (bin centers)")
+
     plt.tight_layout()
     plt.savefig(out_path, dpi=200)
     plt.close()
