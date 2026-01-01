@@ -148,8 +148,10 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
     high_risk_p = float(cf_cfg_raw.get("high_risk_p", 0.7))
     safe_p = float(cf_cfg_raw.get("safe_p", 0.3))
     exmol_preset = str(cf_cfg_raw.get("exmol_preset", "medium"))
-    cf_search_nmols = int(cf_cfg_raw.get("search_nmols", 250))
+    cf_exmol_n_samples = int(cf_cfg_raw.get("exmol_n_samples", cf_cfg_raw.get("search_nmols", 1800)))
+    cf_exmol_n_samples = max(cf_exmol_n_samples, 1500)  # enforce minimum sampling budget
     cf_delta_min = float(cf_cfg_raw.get("delta_min", 0.10))
+    cf_relax_plan = cf_cfg_raw.get("relaxations", [])
 
     constraints = CFConstraints(
         min_tanimoto=float(cf_cfg_raw.get("constraints", {}).get("min_tanimoto", 0.7)),
@@ -433,14 +435,41 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                         safe_prob_max=flip_prob_max,
                         exmol_preset=exmol_preset,
                         nmols=cf_nmols,
-                        search_nmols=cf_search_nmols,
+                        exmol_n_samples=cf_exmol_n_samples,
                         delta_min=cf_delta_min,
+                        relaxation_plan=cf_relax_plan,
                         logger=logger,
                     )
-                except Exception:
+                except Exception as exc:
                     logger.exception("Counterfactual generation failed for %s", mol_id)
                     cfs = []
-                    cf_diag = None
+                    cf_diag = {"error": str(exc), "sampled": 0, "scarcity": True, "final_tier": "error", "final_count": 0}
+
+                if cf_diag:
+                    logger.info(
+                        "CF outcome %s: sampled=%s final_tier=%s relaxation=%s kept=%s scarcity=%s",
+                        mol_id,
+                        cf_diag.get("sampled"),
+                        cf_diag.get("final_tier"),
+                        cf_diag.get("final_relaxation"),
+                        cf_diag.get("final_count"),
+                        cf_diag.get("scarcity"),
+                    )
+                    fallback_used = cf_diag.get("final_tier") not in ("flip", "none", None)
+                    relaxation_used = cf_diag.get("final_relaxation") not in ("none", None, "")
+                    logger.info(
+                        "CF audit flags %s: fallback_tier=%s relaxation_used=%s scarcity=%s",
+                        mol_id,
+                        fallback_used,
+                        relaxation_used,
+                        bool(cf_diag.get("scarcity")),
+                    )
+                    if cf_diag.get("scarcity"):
+                        logger.info(
+                            "Counterfactual scarcity recorded for %s: sampled=%s, no survivors under medicinal constraints.",
+                            mol_id,
+                            cf_diag.get("sampled"),
+                        )
 
                 report_dir = lead_dir / mol_id
                 write_lead_report(

@@ -18,7 +18,10 @@ from hergbench.reporting.sascorer import calculate_sa_score
 
 @dataclass(frozen=True)
 class CFConstraints:
+    # Backward-compatible default min_tanimoto; tier-specific overrides preferred.
     min_tanimoto: float = 0.7
+    min_tanimoto_flip: Optional[float] = None
+    min_tanimoto_improve: Optional[float] = None
     sa_max: float = 4.5
     logp_delta_max: float = 1.5
     qed_min: float = 0.0  # optional; set >0 to enforce
@@ -96,24 +99,77 @@ def generate_counterfactuals_exmol(
     safe_prob_max: float = 0.3,
     exmol_preset: str = "medium",
     nmols: int = 5,
-    search_nmols: int = 250,
+    exmol_n_samples: int = 1800,
+    search_nmols: Optional[int] = None,
     delta_min: float = 0.10,
+    delta_min_tier3: float = 0.05,
+    relaxation_plan: Optional[List[Dict[str, Any]]] = None,
     fpscores_cache_dir: Optional[Path] = None,
     logger: Optional[Any] = None,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """Generate and filter counterfactuals around base_smiles using ExMol + medicinal-chemist filters.
 
     Returns a ranked list of dicts with smiles, similarity, p, delta_p, logp, qed, sascore, alert.
+    Tiered filtering is deterministic and defers all pruning until after a full ExMol sample is drawn.
     """
     import exmol  # type: ignore
 
     p_base = float(model_prob(base_smiles))
     mol_base = Chem.MolFromSmiles(base_smiles)
     if mol_base is None:
-        return [], {"error": "invalid_base_smiles"}
+        return [], {"error": "invalid_base_smiles", "sampled": 0, "final_tier": "none", "final_count": 0, "scarcity": True}
+
+    # Enforce a large ExMol budget to give rare counterfactuals a chance under strict medicinal filters.
+    sample_budget = int(search_nmols if search_nmols is not None else exmol_n_samples)
+    sample_budget = max(sample_budget, 1500)  # hard minimum per design doc
 
     base_props = mol_props(mol_base, cache_dir=fpscores_cache_dir)
     fp_base = mol_to_ecfp_bits(mol_base, fp_cfg)
+
+    # Tier specs encode the success definition; always evaluated on the full sampled pool.
+    tier_specs = [
+        {
+            "name": "flip",
+            "label": "Tier 1 — Flip",
+            "default_min_tanimoto": 0.5,
+            "prob_max": safe_prob_max,  # Tier 1 only
+            "require_delta": False,
+            "delta_min": 0.0,
+            "min_key": "flip",
+        },
+        {
+            "name": "risk_reduction",
+            "label": "Tier 2 — Risk reduction",
+            "default_min_tanimoto": 0.7,
+            "prob_max": None,
+            "require_delta": True,
+            "delta_min": max(delta_min, 0.10),
+            "min_key": "improve",
+        },
+        {
+            "name": "weak_reduction",
+            "label": "Tier 3 — Weak improvement",
+            "default_min_tanimoto": 0.7,
+            "prob_max": None,
+            "require_delta": True,
+            "delta_min": max(delta_min_tier3, 0.05),
+            "min_key": "improve",
+        },
+    ]
+
+    # Relaxation steps are optional and must alter only one constraint each for auditability.
+    validated_relaxations: List[Dict[str, Any]] = []
+    for step in relaxation_plan or []:
+        updates = dict(step.get("updates", {}))
+        if len(updates) > 1:
+            raise ValueError("Each relaxation may adjust only one constraint.")
+        validated_relaxations.append(
+            {
+                "name": str(step.get("name", "unnamed_relaxation")),
+                "description": str(step.get("description", "")),
+                "updates": updates,
+            }
+        )
 
     # ExMol expects a classifier f(smiles)->0/1 for counterfactual search.
     space = exmol.sample_space(
@@ -128,79 +184,115 @@ def generate_counterfactuals_exmol(
     if isinstance(space, tuple):
         space = space[0]
 
-    # counterfactual search (large pool)
-    cfs = exmol.cf_explain(space, nmols=search_nmols, filter_nondrug=False)
+    # Counterfactual search (large pool; no early filtering).
+    cfs = exmol.cf_explain(space, nmols=sample_budget, filter_nondrug=False)
     if isinstance(cfs, tuple):
         cfs = cfs[0]
 
+    cfs = cfs or []
+    sample_count = len(cfs)
+
+    def _apply_relaxation(base_constraints: CFConstraints, updates: Dict[str, Any]) -> CFConstraints:
+        # Only one constraint may change; field names match CFConstraints.
+        kwargs = {
+            "min_tanimoto": base_constraints.min_tanimoto,
+            "sa_max": base_constraints.sa_max,
+            "logp_delta_max": base_constraints.logp_delta_max,
+            "qed_min": base_constraints.qed_min,
+            "pains": base_constraints.pains,
+        }
+        kwargs.update({k: v for k, v in updates.items() if k in kwargs})
+        return CFConstraints(**kwargs)
+
+    def _resolve_min_tanimoto(tier: Dict[str, Any], constraint_set: CFConstraints) -> float:
+        base_min = constraint_set.min_tanimoto
+        if tier["min_key"] == "flip":
+            cfg_min = constraint_set.min_tanimoto_flip if constraint_set.min_tanimoto_flip is not None else base_min
+        else:
+            cfg_min = constraint_set.min_tanimoto_improve if constraint_set.min_tanimoto_improve is not None else base_min
+        return max(tier["default_min_tanimoto"], cfg_min)
+
     def _filter_candidates(
-        min_tanimoto: float,
-        prob_max: Optional[float],
-        logp_delta_max: float,
-        sa_max: float,
-        require_delta: bool,
-        delta_min: float,
-        mode: str,
-    ) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
+        tier: Dict[str, Any],
+        constraint_set: CFConstraints,
+        relaxation_name: str,
+        relaxation_desc: str,
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        min_sim = _resolve_min_tanimoto(tier, constraint_set)
         counts = {
-            "n_total": 0,
-            "n_invalid": 0,
-            "n_sim": 0,
-            "n_prob": 0,
-            "n_sa": 0,
-            "n_logp": 0,
-            "n_qed": 0,
-            "n_alert": 0,
-            "n_delta": 0,
+            "sampled": sample_count,
+            "invalid": 0,
+            "duplicate": 0,
+            "similarity": 0,
+            "prob": 0,
+            "delta": 0,
+            "sa": 0,
+            "logp": 0,
+            "qed": 0,
+            "alert": 0,
+            "kept": 0,
+            "min_tanimoto_used": min_sim,
+            "prob_max_used": tier["prob_max"],
+            "delta_min_used": tier["delta_min"] if tier["require_delta"] else None,
+            "sa_max_used": constraint_set.sa_max,
+            "logp_delta_max_used": constraint_set.logp_delta_max,
+            "qed_min_used": constraint_set.qed_min,
+            "pains_used": constraint_set.pains,
         }
         rows: List[Dict[str, Any]] = []
+        seen = set()
         for ex in cfs:
-            counts["n_total"] += 1
             smi = getattr(ex, "smiles", None)
             if not smi or smi == base_smiles:
-                counts["n_invalid"] += 1
+                counts["invalid"] += 1
                 continue
             mol = Chem.MolFromSmiles(smi)
             if mol is None:
-                counts["n_invalid"] += 1
+                counts["invalid"] += 1
                 continue
             try:
                 Chem.SanitizeMol(mol)
             except Exception:
-                counts["n_invalid"] += 1
+                counts["invalid"] += 1
                 continue
+
+            smi_canon = Chem.MolToSmiles(mol, canonical=True)
+            if smi_canon in seen:
+                counts["duplicate"] += 1
+                continue
+            seen.add(smi_canon)
 
             fp = mol_to_ecfp_bits(mol, fp_cfg)
             sim = float(DataStructs.TanimotoSimilarity(fp_base, fp))
-            if sim < min_tanimoto:
-                counts["n_sim"] += 1
+            if sim < min_sim:
+                counts["similarity"] += 1
                 continue
 
             p = float(model_prob(smi))
             delta_p = p_base - p
-            if prob_max is not None and p > prob_max:
-                counts["n_prob"] += 1
+            if tier["prob_max"] is not None and p >= float(tier["prob_max"]):
+                counts["prob"] += 1
                 continue
-            if require_delta and delta_p < delta_min:
-                counts["n_delta"] += 1
+            if tier["require_delta"] and delta_p < float(tier["delta_min"]):
+                counts["delta"] += 1
                 continue
 
             props = mol_props(mol, cache_dir=fpscores_cache_dir)
-            if props["sascore"] > sa_max:
-                counts["n_sa"] += 1
+            if props["sascore"] > constraint_set.sa_max:
+                counts["sa"] += 1
                 continue
 
-            if abs(props["logp"] - base_props["logp"]) > logp_delta_max:
-                counts["n_logp"] += 1
+            if abs(props["logp"] - base_props["logp"]) > constraint_set.logp_delta_max:
+                counts["logp"] += 1
                 continue
 
-            if constraints.qed_min > 0 and props["qed"] < constraints.qed_min:
-                counts["n_qed"] += 1
+            if constraint_set.qed_min > 0 and props["qed"] < constraint_set.qed_min:
+                counts["qed"] += 1
                 continue
 
-            alert = has_structural_alerts(mol) if constraints.pains else False
+            alert = has_structural_alerts(mol) if constraint_set.pains else False
             if alert:
-                counts["n_alert"] += 1
+                counts["alert"] += 1
                 continue
 
             rows.append(
@@ -213,88 +305,89 @@ def generate_counterfactuals_exmol(
                     "qed": props["qed"],
                     "sascore": props["sascore"],
                     "alert": alert,
-                    "mode": mode,
+                    "tier": tier["name"],
+                    "tier_label": tier["label"],
+                    "relaxation": relaxation_name,
+                    "relaxation_desc": relaxation_desc,
                 }
             )
-        counts["n_final"] = len(rows)
+        rows = _dedupe_by_smiles(rows)
+        counts["kept"] = len(rows)
         return rows, counts
 
     attempts: List[Dict[str, Any]] = []
+    final_rows: List[Dict[str, Any]] = []
+    final_tier = "none"
+    final_relaxation = "none"
+    final_relaxation_desc = "baseline constraints"
 
-    # Tier A: strict flip
-    rows, counts = _filter_candidates(
-        min_tanimoto=constraints.min_tanimoto,
-        prob_max=safe_prob_max,
-        logp_delta_max=constraints.logp_delta_max,
-        sa_max=constraints.sa_max,
-        require_delta=False,
-        delta_min=0.0,
-        mode="flip",
+    def _run_tiers(
+        active_constraints: CFConstraints, relaxation_name: str, relaxation_desc: str
+    ) -> Tuple[List[Dict[str, Any]], str, str]:
+        nonlocal attempts
+        for tier in tier_specs:
+            rows, counts = _filter_candidates(tier, active_constraints, relaxation_name, relaxation_desc)
+            attempts.append(
+                {
+                    "tier": tier["name"],
+                    "tier_label": tier["label"],
+                    "relaxation": relaxation_name,
+                    "relaxation_desc": relaxation_desc,
+                    "counts": counts,
+                }
+            )
+            if logger:
+                logger.info(
+                    "CF filtering %s (%s): %s",
+                    tier["name"],
+                    relaxation_name or "none",
+                    counts,
+                )
+            if rows:
+                return rows, tier["name"], tier["label"]
+        return [], "none", ""
+
+    # Baseline tiers
+    final_rows, final_tier, final_tier_label = _run_tiers(
+        constraints, relaxation_name="none", relaxation_desc="baseline constraints"
     )
-    attempts.append({"tier": "strict", "counts": counts})
-    if logger:
-        logger.info("CF filtering (strict): %s", counts)
 
-    # Tier B: relaxed filters but still require flip (p <= target)
-    if not rows:
-        rows, counts = _filter_candidates(
-            min_tanimoto=max(0.55, constraints.min_tanimoto - 0.10),
-            prob_max=safe_prob_max,
-            logp_delta_max=constraints.logp_delta_max + 0.75,
-            sa_max=constraints.sa_max + 0.5,
-            require_delta=False,
-            delta_min=0.0,
-            mode="flip",
-        )
-        attempts.append({"tier": "relaxed_flip", "counts": counts})
-        if logger:
-            logger.info("CF filtering (relaxed flip): %s", counts)
+    # Controlled single-constraint relaxation attempts, if configured and no hits yet.
+    final_relaxation = "none"
+    final_relaxation_desc = "baseline constraints"
+    if not final_rows:
+        for step in validated_relaxations:
+            relaxed_constraints = _apply_relaxation(constraints, step["updates"])
+            rows, tier_name, tier_label = _run_tiers(
+                relaxed_constraints,
+                relaxation_name=step["name"],
+                relaxation_desc=step["description"],
+            )
+            if rows:
+                final_rows = rows
+                final_tier = tier_name
+                final_tier_label = tier_label
+                final_relaxation = step["name"]
+                final_relaxation_desc = step["description"]
+                break
 
-    # Tier C: risk reduction (relaxed filters, require delta_p >= delta_min)
-    if not rows:
-        rows, counts = _filter_candidates(
-            min_tanimoto=max(0.55, constraints.min_tanimoto - 0.10),
-            prob_max=None,  # allow above threshold but require risk reduction
-            logp_delta_max=constraints.logp_delta_max + 0.75,
-            sa_max=constraints.sa_max + 0.5,
-            require_delta=True,
-            delta_min=delta_min,
-            mode="risk_reduction",
-        )
-        attempts.append({"tier": "risk_reduction", "counts": counts})
-        if logger:
-            logger.info("CF filtering (risk reduction): %s", counts)
-
-    # Final fallback: any chem-valid candidates ranked by delta_p
-    weak_rows: List[Dict[str, Any]] = []
-    if not rows:
-        weak_rows, weak_counts = _filter_candidates(
-            min_tanimoto=max(0.55, constraints.min_tanimoto - 0.10),
-            prob_max=None,
-            logp_delta_max=constraints.logp_delta_max + 0.75,
-            sa_max=constraints.sa_max + 0.5,
-            require_delta=False,
-            delta_min=0.0,
-            mode="weak_reduction",
-        )
-        attempts.append({"tier": "weak_reduction", "counts": weak_counts})
-        if logger:
-            logger.info("CF filtering (weak reduction): %s", weak_counts)
-        rows = weak_rows
-
-    rows = _dedupe_by_smiles(rows)
-
-    # rank: high sim, high risk drop; simple linear score
-    rows.sort(key=lambda r: (r["delta_p"], r["similarity"]), reverse=True)
-    rows = rows[:nmols]
+    # rank: high risk drop then high similarity to prefer meaningful and close suggestions
+    final_rows.sort(key=lambda r: (r["delta_p"], r["similarity"]), reverse=True)
+    final_rows = final_rows[:nmols]
 
     diag = {
+        "sampled": sample_count,
+        "sample_budget": sample_budget,
         "target_prob_max": float(safe_prob_max),
         "attempts": attempts,
-        "final_tier": attempts[-1]["tier"] if attempts else "none",
-        "final_count": len(rows),
+        "final_tier": final_tier,
+        "final_tier_label": final_tier_label if final_tier_label else final_tier,
+        "final_relaxation": final_relaxation,
+        "final_relaxation_desc": final_relaxation_desc,
+        "final_count": len(final_rows),
+        "scarcity": len(final_rows) == 0,
     }
-    return rows, diag
+    return final_rows, diag
 
 
 def write_lead_report(
@@ -327,33 +420,67 @@ def write_lead_report(
     md.append(f"- **Max similarity to train:** {max_sim:.3f} (**bin:** {sim_bin})\n")
     md.append("\n![](base.png)\n")
 
-    md.append("\n## Counterfactual suggestions (filtered)\n")
-    if not counterfactuals:
-        md.append("_No valid counterfactuals found under current constraints._\n")
+    md.append("\n## Counterfactual search summary\n")
+    if cf_summary:
+        sampled = cf_summary.get("sampled", "n/a")
+        sample_budget = cf_summary.get("sample_budget", sampled)
+        attempts = cf_summary.get("attempts", [])
+        final_tier = cf_summary.get("final_tier", "none")
+        final_tier_label = cf_summary.get("final_tier_label", final_tier)
+        final_relax = cf_summary.get("final_relaxation", "none")
+        scarcity = bool(cf_summary.get("scarcity", False))
+        md.append(f"- ExMol sample budget: {sample_budget} (drawn: {sampled})\n")
+        md.append(f"- Candidates sampled (ExMol): {sampled}\n")
+        md.append(f"- Target prob max (flip goal): {cf_summary.get('target_prob_max', 'n/a')}\n")
+        md.append(
+            f"- Tier used: {final_tier_label if final_tier != 'none' else 'None'}"
+            f" (relaxation: {final_relax if final_relax else 'none'})\n"
+        )
+        md.append(f"- Survivors after filtering: {cf_summary.get('final_count', 0)}\n")
+        if scarcity:
+            md.append("- Scarcity: No candidates survived medicinal constraints.\n")
+        if cf_summary.get("final_relaxation_desc"):
+            md.append(f"- Relaxation note: {cf_summary.get('final_relaxation_desc')}\n")
+        if attempts:
+            md.append("\n### Filter attrition by tier\n")
+            md.append(
+                "| Tier | Relaxation | Sampled | Kept | Invalid | Duplicate | Similarity | Prob | Δp | SA | ΔLogP | QED | Alerts |\n"
+            )
+            md.append("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|\n")
+            for a in attempts:
+                c = a.get("counts", {})
+                md.append(
+                    f"| {a.get('tier_label', a.get('tier'))} | {a.get('relaxation', 'none')} | "
+                    f"{c.get('sampled', 0)} | {c.get('kept', 0)} | {c.get('invalid', 0)} | {c.get('duplicate', 0)} | "
+                    f"{c.get('similarity', 0)} | {c.get('prob', 0)} | {c.get('delta', 0)} | {c.get('sa', 0)} | "
+                    f"{c.get('logp', 0)} | {c.get('qed', 0)} | {c.get('alert', 0)} |\n"
+                )
     else:
-        md.append("| Rank | Image | Similarity | p(toxic) | Δp | LogP | QED | SA | Mode |\n")
-        md.append("|---:|:---:|---:|---:|---:|---:|---:|---:|---|\n")
+        md.append("- Counterfactual diagnostics unavailable; see logs.\n")
+
+    md.append("\n## Counterfactual suggestions (filtered)\n")
+    if counterfactuals:
+        md.append("| Rank | Image | Tier | Relaxation | Similarity | p(toxic) | Δp | LogP | QED | SA |\n")
+        md.append("|---:|:---:|---|---|---:|---:|---:|---:|---:|---:|\n")
         for i, cf in enumerate(counterfactuals, start=1):
             img = f"cf_{i:02d}.png"
             md.append(
-                f"| {i} | ![]({img}) | {cf['similarity']:.3f} | {cf['p']:.3f} | {cf['delta_p']:.3f} | "
-                f"{cf['logp']:.2f} | {cf['qed']:.2f} | {cf['sascore']:.2f} | {cf.get('mode','')} |\n"
+                f"| {i} | ![]({img}) | {cf.get('tier_label', cf.get('tier',''))} | {cf.get('relaxation','none')} | "
+                f"{cf['similarity']:.3f} | {cf['p']:.3f} | {cf['delta_p']:.3f} | "
+                f"{cf['logp']:.2f} | {cf['qed']:.2f} | {cf['sascore']:.2f} |\n"
             )
         md.append("\n### Raw counterfactual records\n")
         md.append("```json\n")
         md.append(json.dumps(counterfactuals, indent=2))
         md.append("\n```\n")
-
-    md.append("\n## CF generation summary\n")
-    if cf_summary:
-        md.append(f"- Target prob max: {cf_summary.get('target_prob_max', 'n/a')}\n")
-        md.append(f"- Final tier: {cf_summary.get('final_tier', 'n/a')} (kept {cf_summary.get('final_count', 0)})\n")
-        attempts = cf_summary.get("attempts", [])
-        if attempts:
-            md.append("- Filter counts by tier:\n")
-            for a in attempts:
-                md.append(f"  - {a.get('tier')}: {a.get('counts')}\n")
     else:
-        md.append("- No CF diagnostics available.\n")
+        md.append("### No valid counterfactuals under medicinal constraints\n")
+        if cf_summary:
+            md.append(f"- Total candidates sampled: {cf_summary.get('sampled', 'n/a')}\n")
+            tiers_seen = [a.get("tier_label", a.get("tier")) for a in cf_summary.get("attempts", [])]
+            md.append(f"- Tiers evaluated: {', '.join(tiers_seen)}\n")
+            md.append("- Interpretation: Local detoxification may not be feasible near this chemistry under current constraints.\n")
+        else:
+            md.append("- Interpretation: Counterfactual search failed before filtering; check logs.\n")
 
     (out_dir / "report.md").write_text("".join(md), encoding="utf-8")

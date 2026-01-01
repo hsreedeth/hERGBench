@@ -1,5 +1,0 @@
-[2025-12-29 21:25:51,273] INFO - Starting Stage 0 run: 2025-12-29_212551_seed42_stage0_smoke_test
-[2025-12-29 21:25:57,868] INFO - Global seed set to 42
-[2025-12-29 21:25:58,474] INFO - Wrote run metadata and resolved config
-[2025-12-29 21:25:58,474] INFO - Wrote stage0_ok.txt
-[2025-12-29 21:25:58,474] INFO - Stage 0 completed successfully.

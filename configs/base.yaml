@@ -71,15 +71,17 @@ stage1:
     high_risk_p: 0.7
     safe_p: 0.3
     exmol_preset: "medium"
+    exmol_n_samples: 1800      # hard minimum 1500 to surface rare valid counterfactuals
     nmols: 5
+    delta_min: 0.10            # risk-reduction floor (Tier 2); Tier 3 fixed at 0.05
     max_targets: 20
+    relaxations: []            # optional single-constraint relaxations, each audited in reports
     constraints:
-      min_tanimoto: 0.7
+      min_tanimoto: 0.5
       sa_max: 4.5
       logp_delta_max: 1.5
       qed_min: 0.0
       pains: true
-
 
 
 
