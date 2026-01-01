@@ -1,5 +1,5 @@
 # Stage 1 MVP (baseline-only) with triple split types and medicinal-chemist counterfactual filter
-# Adjust paths if your repo differs.
+# Adjust paths (important)
 project:
   project_name: "hergbench"
   run_name: "stage1_mvp"
