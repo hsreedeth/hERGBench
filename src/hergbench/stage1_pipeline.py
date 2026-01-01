@@ -25,7 +25,7 @@ from hergbench.evaluation.eval import (
 )
 from hergbench.features.fingerprints import FingerprintConfig, bulk_max_tanimoto, fps_to_numpy, mol_to_ecfp_bits
 from hergbench.models.xgb_optuna import XGBConfig, fit_xgb, tune_xgb
-from hergbench.reporting.lead_opt import CFConstraints, generate_counterfactuals_exmol, write_lead_report
+from hergbench.reporting.lead_opt import CFConstraints, dataset_analogues, generate_counterfactuals_exmol, write_lead_report
 
 
 @dataclass(frozen=True)
@@ -149,7 +149,7 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
     safe_p = float(cf_cfg_raw.get("safe_p", 0.3))
     exmol_preset = str(cf_cfg_raw.get("exmol_preset", "medium"))
     cf_exmol_n_samples = int(cf_cfg_raw.get("exmol_n_samples", cf_cfg_raw.get("search_nmols", 1800)))
-    cf_exmol_n_samples = max(cf_exmol_n_samples, 1500)  # enforce minimum sampling budget
+    cf_exmol_n_samples = min(max(cf_exmol_n_samples, 1500), 2000)  # enforce sampling budget bounds
     cf_delta_min = float(cf_cfg_raw.get("delta_min", 0.10))
     cf_delta_min_tier3 = float(cf_cfg_raw.get("delta_min_tier3", 0.05))
     cf_relax_plan = cf_cfg_raw.get("relaxations", [])
@@ -371,6 +371,10 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
             tr_idx0 = [idx_map[i] for i in train_df0["mol_id"].astype(str).tolist()]
             train_fps0 = [fps_all[i] for i in tr_idx0]
 
+            # Precompute dataset-wide predictions for deterministic analogue fallback.
+            dataset_smiles = df["smiles"].astype(str).tolist()
+            p_all_cal = cal_model.predict_proba(X_all)[:, 1]
+
             # Candidate selection
             lead_candidates: List[Dict[str, Any]] = []
             for mol_id, smi, y, p, y_pred in zip(
@@ -449,15 +453,39 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                     cfs = []
                     cf_diag = {"error": str(exc), "sampled": 0, "scarcity": True, "final_tier": "error", "final_count": 0}
 
+                if cf_diag is None:
+                    cf_diag = {}
+
+                dataset_fallback: List[Dict[str, Any]] = []
+                if not cfs:
+                    dataset_fallback = dataset_analogues(
+                        base_smiles=smi,
+                        base_fp=fp,
+                        base_p=p_cal,
+                        dataset_smiles=dataset_smiles,
+                        dataset_fps=fps_all,
+                        dataset_probs=p_all_cal,
+                        fp_cfg=fp_cfg,
+                        top_k=cf_nmols,
+                    )
+                    cf_diag["dataset_fallback_used"] = True
+                    cf_diag["final_tier"] = cf_diag.get("final_tier", "dataset_fallback")
+                    cf_diag["final_count"] = len(dataset_fallback)
+                    cf_diag["scarcity"] = False if dataset_fallback else True
+                    logger.info("Dataset analogue fallback used for %s: n=%d", mol_id, len(dataset_fallback))
+                else:
+                    cf_diag["dataset_fallback_used"] = False
+
                 if cf_diag:
                     logger.info(
-                        "CF outcome %s: sampled=%s final_tier=%s relaxation=%s kept=%s scarcity=%s",
+                        "CF outcome %s: sampled=%s final_tier=%s relaxation=%s kept=%s scarcity=%s fallback_used=%s",
                         mol_id,
                         cf_diag.get("sampled"),
                         cf_diag.get("final_tier"),
                         cf_diag.get("final_relaxation"),
                         cf_diag.get("final_count"),
                         cf_diag.get("scarcity"),
+                        cf_diag.get("dataset_fallback_used"),
                     )
                     fallback_used = cf_diag.get("final_tier") not in ("flip", "none", None)
                     relaxation_used = cf_diag.get("final_relaxation") not in ("none", None, "")
@@ -486,6 +514,7 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                     max_sim=max_sim,
                     sim_bin=sim_bin,
                     counterfactuals=cfs,
+                    dataset_analogues=dataset_fallback,
                     cf_summary=cf_diag,
                 )
                 logger.info("Lead report %d/%d written: %s", i, len(lead_candidates), report_dir)

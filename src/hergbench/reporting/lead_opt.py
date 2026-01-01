@@ -90,6 +90,58 @@ def _dedupe_by_smiles(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return out
 
 
+def dataset_analogues(
+    base_smiles: str,
+    base_fp,
+    base_p: float,
+    dataset_smiles: List[str],
+    dataset_fps,
+    dataset_probs: List[float],
+    fp_cfg: FingerprintConfig,
+    top_k: int = 5,
+    min_sim: float = 0.3,
+    fpscores_cache_dir: Optional[Path] = None,
+) -> List[Dict[str, Any]]:
+    """Return dataset-derived analogues (lowest predicted risk, similar to base).
+
+    If no molecules meet min_sim, fall back to top_k by similarity regardless of p.
+    """
+    entries: List[Dict[str, Any]] = []
+    for smi, fp, p in zip(dataset_smiles, dataset_fps, dataset_probs):
+        if smi == base_smiles:
+            continue
+        sim = float(DataStructs.TanimotoSimilarity(base_fp, fp))
+        try:
+            mol = Chem.MolFromSmiles(smi)
+            Chem.SanitizeMol(mol)
+        except Exception:
+            continue
+        props = mol_props(mol, cache_dir=fpscores_cache_dir)
+        alert = has_structural_alerts(mol)
+        entries.append(
+            {
+                "smiles": smi,
+                "similarity": sim,
+                "p": float(p),
+                "delta_p": base_p - float(p),
+                "logp": props["logp"],
+                "qed": props["qed"],
+                "sascore": props["sascore"],
+                "alert": alert,
+                "tier": "dataset_analogue",
+                "tier_label": "Dataset analogue",
+                "relaxation": "none",
+                "relaxation_desc": "dataset fallback",
+            }
+        )
+
+    # Primary filter: enforce similarity >= min_sim
+    primary = [e for e in entries if e["similarity"] >= min_sim]
+    pool = primary if primary else entries
+    pool.sort(key=lambda r: (r["p"], -r["similarity"], r["smiles"]))
+    return pool[:top_k]
+
+
 def generate_counterfactuals_exmol(
     base_smiles: str,
     model_class: Callable[[str], int],
@@ -119,9 +171,9 @@ def generate_counterfactuals_exmol(
     if mol_base is None:
         return [], {"error": "invalid_base_smiles", "sampled": 0, "final_tier": "none", "final_count": 0, "scarcity": True}
 
-    # Enforce a large ExMol budget to give rare counterfactuals a chance under strict medicinal filters.
+    # Enforce a large ExMol budget (bounded) to give rare counterfactuals a chance under strict medicinal filters.
     sample_budget = int(search_nmols if search_nmols is not None else exmol_n_samples)
-    sample_budget = max(sample_budget, 1500)  # hard minimum per design doc
+    sample_budget = min(max(sample_budget, 1500), 2000)
 
     base_props = mol_props(mol_base, cache_dir=fpscores_cache_dir)
     fp_base = mol_to_ecfp_bits(mol_base, fp_cfg)
@@ -170,6 +222,14 @@ def generate_counterfactuals_exmol(
                 "updates": updates,
             }
         )
+    relaxation_steps: List[Dict[str, Any]] = [
+        {"name": "relax_flip_0.4", "description": "lower flip min_tanimoto to 0.4", "updates": {"min_tanimoto_flip": 0.4}},
+        {"name": "relax_flip_0.3", "description": "lower flip min_tanimoto to 0.3", "updates": {"min_tanimoto_flip": 0.3}},
+        {"name": "relax_improve_0.6", "description": "lower improve min_tanimoto to 0.6", "updates": {"min_tanimoto_improve": 0.6}},
+        {"name": "relax_improve_0.5", "description": "lower improve min_tanimoto to 0.5", "updates": {"min_tanimoto_improve": 0.5}},
+        {"name": "relax_sa_5.5", "description": "raise SA max to 5.5", "updates": {"sa_max": 5.5}},
+    ]
+    relaxation_steps.extend(validated_relaxations)
 
     # ExMol expects a classifier f(smiles)->0/1 for counterfactual search.
     space = exmol.sample_space(
@@ -179,7 +239,7 @@ def generate_counterfactuals_exmol(
         preset=exmol_preset,
         use_selfies=False,
         quiet=True,
-        method_kwargs=None,
+        method_kwargs=None,  # cf_explain handles sampling budget; sample_space cannot accept nmols for some presets
     )
     if isinstance(space, tuple):
         space = space[0]
@@ -225,13 +285,13 @@ def generate_counterfactuals_exmol(
             "sampled": sample_count,
             "invalid": 0,
             "duplicate": 0,
-            "similarity": 0,
-            "prob": 0,
-            "delta": 0,
-            "sa": 0,
-            "logp": 0,
-            "qed": 0,
-            "alert": 0,
+            "similarity_filtered": 0,
+            "prob_filtered": 0,
+            "delta_filtered": 0,
+            "sa_filtered": 0,
+            "logp_filtered": 0,
+            "qed_filtered": 0,
+            "alert_filtered": 0,
             "kept": 0,
             "min_tanimoto_used": min_sim,
             "prob_max_used": tier["prob_max"],
@@ -267,34 +327,34 @@ def generate_counterfactuals_exmol(
             fp = mol_to_ecfp_bits(mol, fp_cfg)
             sim = float(DataStructs.TanimotoSimilarity(fp_base, fp))
             if sim < min_sim:
-                counts["similarity"] += 1
+                counts["similarity_filtered"] += 1
                 continue
 
             p = float(model_prob(smi))
             delta_p = p_base - p
             if tier["prob_max"] is not None and p >= float(tier["prob_max"]):
-                counts["prob"] += 1
+                counts["prob_filtered"] += 1
                 continue
             if tier["require_delta"] and delta_p < float(tier["delta_min"]):
-                counts["delta"] += 1
+                counts["delta_filtered"] += 1
                 continue
 
             props = mol_props(mol, cache_dir=fpscores_cache_dir)
             if props["sascore"] > constraint_set.sa_max:
-                counts["sa"] += 1
+                counts["sa_filtered"] += 1
                 continue
 
             if abs(props["logp"] - base_props["logp"]) > constraint_set.logp_delta_max:
-                counts["logp"] += 1
+                counts["logp_filtered"] += 1
                 continue
 
             if constraint_set.qed_min > 0 and props["qed"] < constraint_set.qed_min:
-                counts["qed"] += 1
+                counts["qed_filtered"] += 1
                 continue
 
             alert = has_structural_alerts(mol) if constraint_set.pains else False
             if alert:
-                counts["alert"] += 1
+                counts["alert_filtered"] += 1
                 continue
 
             rows.append(
@@ -357,8 +417,9 @@ def generate_counterfactuals_exmol(
     # Controlled single-constraint relaxation attempts, if configured and no hits yet.
     final_relaxation = "none"
     final_relaxation_desc = "baseline constraints"
+    relaxation_used = False
     if not final_rows:
-        for step in validated_relaxations:
+        for step in relaxation_steps:
             relaxed_constraints = _apply_relaxation(constraints, step["updates"])
             rows, tier_name, tier_label = _run_tiers(
                 relaxed_constraints,
@@ -371,6 +432,7 @@ def generate_counterfactuals_exmol(
                 final_tier_label = tier_label
                 final_relaxation = step["name"]
                 final_relaxation_desc = step["description"]
+                relaxation_used = True
                 break
 
     # rank: high risk drop then high similarity to prefer meaningful and close suggestions
@@ -386,6 +448,7 @@ def generate_counterfactuals_exmol(
         "final_tier_label": final_tier_label if final_tier_label else final_tier,
         "final_relaxation": final_relaxation,
         "final_relaxation_desc": final_relaxation_desc,
+        "relaxation_used": relaxation_used,
         "final_count": len(final_rows),
         "scarcity": len(final_rows) == 0,
     }
@@ -402,6 +465,7 @@ def write_lead_report(
     max_sim: float,
     sim_bin: str,
     counterfactuals: List[Dict[str, Any]],
+    dataset_analogues: Optional[List[Dict[str, Any]]] = None,
     cf_summary: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Write a single-molecule lead optimization report as Markdown + PNG images."""
@@ -410,6 +474,8 @@ def write_lead_report(
 
     for i, cf in enumerate(counterfactuals, start=1):
         depict_smiles(cf["smiles"], out_dir / f"cf_{i:02d}.png")
+    for i, ana in enumerate(dataset_analogues or [], start=1):
+        depict_smiles(ana["smiles"], out_dir / f"ds_{i:02d}.png")
 
     y_pred = int(p_cal >= threshold)
     md = []
@@ -430,7 +496,9 @@ def write_lead_report(
         final_tier = cf_summary.get("final_tier", "none")
         final_tier_label = cf_summary.get("final_tier_label", final_tier)
         final_relax = cf_summary.get("final_relaxation", "none")
+        relaxation_used = bool(cf_summary.get("relaxation_used", False))
         scarcity = bool(cf_summary.get("scarcity", False))
+        fallback_used = bool(dataset_analogues)
         md.append(f"- ExMol sample budget: {sample_budget} (drawn: {sampled})\n")
         md.append(f"- Candidates sampled (ExMol): {sampled}\n")
         md.append(f"- Target prob max (flip goal): {cf_summary.get('target_prob_max', 'n/a')}\n")
@@ -438,7 +506,9 @@ def write_lead_report(
             f"- Tier used: {final_tier_label if final_tier != 'none' else 'None'}"
             f" (relaxation: {final_relax if final_relax else 'none'})\n"
         )
+        md.append(f"- Relaxation used: {relaxation_used}\n")
         md.append(f"- Survivors after filtering: {cf_summary.get('final_count', 0)}\n")
+        md.append(f"- Dataset analogue fallback used: {fallback_used}\n")
         if scarcity:
             md.append("- Scarcity: No candidates survived medicinal constraints.\n")
         if cf_summary.get("final_relaxation_desc"):
@@ -454,8 +524,8 @@ def write_lead_report(
                 md.append(
                     f"| {a.get('tier_label', a.get('tier'))} | {a.get('relaxation', 'none')} | "
                     f"{c.get('sampled', 0)} | {c.get('kept', 0)} | {c.get('invalid', 0)} | {c.get('duplicate', 0)} | "
-                    f"{c.get('similarity', 0)} | {c.get('prob', 0)} | {c.get('delta', 0)} | {c.get('sa', 0)} | "
-                    f"{c.get('logp', 0)} | {c.get('qed', 0)} | {c.get('alert', 0)} |\n"
+                    f"{c.get('similarity_filtered', 0)} | {c.get('prob_filtered', 0)} | {c.get('delta_filtered', 0)} | {c.get('sa_filtered', 0)} | "
+                    f"{c.get('logp_filtered', 0)} | {c.get('qed_filtered', 0)} | {c.get('alert_filtered', 0)} |\n"
                 )
     else:
         md.append("- Counterfactual diagnostics unavailable; see logs.\n")
@@ -484,5 +554,21 @@ def write_lead_report(
             md.append("- Interpretation: Local detoxification may not be feasible near this chemistry under current constraints.\n")
         else:
             md.append("- Interpretation: Counterfactual search failed before filtering; check logs.\n")
+
+    if dataset_analogues:
+        md.append("\n## Dataset-derived analogues (fallback)\n")
+        md.append("_Selected from dataset by lowest predicted p(toxic) with similarity ≥0.3; used when generated counterfactuals are unavailable._\n")
+        md.append("| Rank | Image | Similarity | p(toxic) | Δp | LogP | QED | SA | Alerts |\n")
+        md.append("|---:|:---:|---:|---:|---:|---:|---:|---:|---:|\n")
+        for i, ana in enumerate(dataset_analogues, start=1):
+            img = f"ds_{i:02d}.png"
+            md.append(
+                f"| {i} | ![]({img}) | {ana['similarity']:.3f} | {ana['p']:.3f} | {ana['delta_p']:.3f} | "
+                f"{ana['logp']:.2f} | {ana['qed']:.2f} | {ana['sascore']:.2f} | {('⚠' if ana.get('alert') else 'OK')} |\n"
+            )
+        md.append("\n### Raw analogue records\n")
+        md.append("```json\n")
+        md.append(json.dumps(dataset_analogues, indent=2))
+        md.append("\n```\n")
 
     (out_dir / "report.md").write_text("".join(md), encoding="utf-8")

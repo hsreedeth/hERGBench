@@ -58,7 +58,7 @@ stage1:
     high_risk_p: 0.7
     safe_p: 0.3                # Tier-1 flip only; Tier-2/3 governed by delta_min thresholds
     exmol_preset: "medium"
-    exmol_n_samples: 1800      # hard minimum 1500 to surface rare valid counterfactuals
+    exmol_n_samples: 1800      # bounded to 1500–2000 to surface rare valid counterfactuals
     nmols: 5
     delta_min: 0.10            # risk-reduction floor (Tier 2)
     delta_min_tier3: 0.05      # risk-reduction floor (Tier 3)
