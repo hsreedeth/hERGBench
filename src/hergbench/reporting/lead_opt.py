@@ -196,6 +196,8 @@ def generate_counterfactuals_exmol(
         # Only one constraint may change; field names match CFConstraints.
         kwargs = {
             "min_tanimoto": base_constraints.min_tanimoto,
+            "min_tanimoto_flip": base_constraints.min_tanimoto_flip,
+            "min_tanimoto_improve": base_constraints.min_tanimoto_improve,
             "sa_max": base_constraints.sa_max,
             "logp_delta_max": base_constraints.logp_delta_max,
             "qed_min": base_constraints.qed_min,

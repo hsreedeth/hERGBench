@@ -23,5 +23,6 @@ reports/lead_reports
 notes.txt
 explanation_tutorial_notes.txt
 gitcomms.txt
+technical.md
 
 # Can choose to include data_splits later (it is reproducibility-critical) for now data arw and processed are ignored.

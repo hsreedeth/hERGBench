@@ -151,10 +151,13 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
     cf_exmol_n_samples = int(cf_cfg_raw.get("exmol_n_samples", cf_cfg_raw.get("search_nmols", 1800)))
     cf_exmol_n_samples = max(cf_exmol_n_samples, 1500)  # enforce minimum sampling budget
     cf_delta_min = float(cf_cfg_raw.get("delta_min", 0.10))
+    cf_delta_min_tier3 = float(cf_cfg_raw.get("delta_min_tier3", 0.05))
     cf_relax_plan = cf_cfg_raw.get("relaxations", [])
 
     constraints = CFConstraints(
         min_tanimoto=float(cf_cfg_raw.get("constraints", {}).get("min_tanimoto", 0.7)),
+        min_tanimoto_flip=cf_cfg_raw.get("constraints", {}).get("min_tanimoto_flip"),
+        min_tanimoto_improve=cf_cfg_raw.get("constraints", {}).get("min_tanimoto_improve"),
         sa_max=float(cf_cfg_raw.get("constraints", {}).get("sa_max", 4.5)),
         logp_delta_max=float(cf_cfg_raw.get("constraints", {}).get("logp_delta_max", 1.5)),
         qed_min=float(cf_cfg_raw.get("constraints", {}).get("qed_min", 0.0)),
@@ -437,6 +440,7 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                         nmols=cf_nmols,
                         exmol_n_samples=cf_exmol_n_samples,
                         delta_min=cf_delta_min,
+                        delta_min_tier3=cf_delta_min_tier3,
                         relaxation_plan=cf_relax_plan,
                         logger=logger,
                     )
