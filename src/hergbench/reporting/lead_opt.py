@@ -477,15 +477,46 @@ def write_lead_report(
     for i, ana in enumerate(dataset_analogues or [], start=1):
         depict_smiles(ana["smiles"], out_dir / f"ds_{i:02d}.png")
 
+    def _ood_flag(sim: float) -> str:
+        if sim < 0.30:
+            return "Very out-of-domain"
+        if sim < 0.50:
+            return "Out-of-domain"
+        if sim < 0.70:
+            return "Borderline"
+        return "In-domain"
+
+    ood = _ood_flag(max_sim)
+    if counterfactuals:
+        result_class = f"Generated suggestions available (Tier: {counterfactuals[0].get('tier_label', counterfactuals[0].get('tier', 'n/a'))})"
+    elif dataset_analogues:
+        result_class = "No generated suggestions; dataset analogues provided"
+    else:
+        result_class = "No suggestions available"
+
+    def _ood_sentence(flag: str) -> str:
+        if flag == "Very out-of-domain":
+            return "Similarity is very low; generated suggestions may be scarce and fallback analogues are provided for context."
+        if flag == "Out-of-domain":
+            return "Similarity is low; treat any suggestions cautiously and consult fallback analogues."
+        if flag == "Borderline":
+            return "Similarity is borderline; suggestions may be limited but still informative."
+        return "Similarity is in-domain; suggestions should be more reliable locally."
+
     y_pred = int(p_cal >= threshold)
     md = []
     md.append(f"# Lead Optimization Report — {mol_id}\n")
-    md.append("## Base molecule\n")
-    md.append(f"- **SMILES:** `{base_smiles}`\n")
-    md.append(f"- **True label:** {int(y_true)}\n")
+    md.append("## Summary\n")
     md.append(f"- **Calibrated p(toxic):** {p_cal:.3f}\n")
     md.append(f"- **Threshold:** {threshold:.3f} → **Predicted class:** {y_pred}\n")
     md.append(f"- **Max similarity to train:** {max_sim:.3f} (**bin:** {sim_bin})\n")
+    md.append(f"- **OOD classification:** {ood}\n")
+    md.append(f"- **Result classification:** {result_class}\n")
+    md.append(f"- {_ood_sentence(ood)}\n")
+
+    md.append("## Base molecule\n")
+    md.append(f"- **SMILES:** `{base_smiles}`\n")
+    md.append(f"- **True label:** {int(y_true)}\n")
     md.append("\n![](base.png)\n")
 
     md.append("\n## Counterfactual search summary\n")
@@ -500,12 +531,7 @@ def write_lead_report(
         scarcity = bool(cf_summary.get("scarcity", False))
         fallback_used = bool(dataset_analogues)
         md.append(f"- ExMol sample budget: {sample_budget} (drawn: {sampled})\n")
-        md.append(f"- Candidates sampled (ExMol): {sampled}\n")
-        md.append(f"- Target prob max (flip goal): {cf_summary.get('target_prob_max', 'n/a')}\n")
-        md.append(
-            f"- Tier used: {final_tier_label if final_tier != 'none' else 'None'}"
-            f" (relaxation: {final_relax if final_relax else 'none'})\n"
-        )
+        md.append(f"- Tier used: {final_tier_label if final_tier != 'none' else 'None'} (relaxation: {final_relax if final_relax else 'none'})\n")
         md.append(f"- Relaxation used: {relaxation_used}\n")
         md.append(f"- Survivors after filtering: {cf_summary.get('final_count', 0)}\n")
         md.append(f"- Dataset analogue fallback used: {fallback_used}\n")
@@ -515,38 +541,37 @@ def write_lead_report(
             md.append(f"- Relaxation note: {cf_summary.get('final_relaxation_desc')}\n")
         if attempts:
             md.append("\n### Filter attrition by tier\n")
-            md.append(
-                "| Tier | Relaxation | Sampled | Kept | Invalid | Duplicate | Similarity | Prob | Δp | SA | ΔLogP | QED | Alerts |\n"
-            )
-            md.append("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|\n")
+            md.append("<table>\n")
+            md.append("<tr><th>Tier</th><th>Relaxation</th><th>Sampled</th><th>Kept</th><th>Invalid</th><th>Duplicate</th><th>Similarity</th><th>Prob</th><th>Δp</th><th>SA</th><th>ΔLogP</th><th>QED</th><th>Alerts</th></tr>\n")
             for a in attempts:
                 c = a.get("counts", {})
                 md.append(
-                    f"| {a.get('tier_label', a.get('tier'))} | {a.get('relaxation', 'none')} | "
-                    f"{c.get('sampled', 0)} | {c.get('kept', 0)} | {c.get('invalid', 0)} | {c.get('duplicate', 0)} | "
-                    f"{c.get('similarity_filtered', 0)} | {c.get('prob_filtered', 0)} | {c.get('delta_filtered', 0)} | {c.get('sa_filtered', 0)} | "
-                    f"{c.get('logp_filtered', 0)} | {c.get('qed_filtered', 0)} | {c.get('alert_filtered', 0)} |\n"
+                    f"<tr><td>{a.get('tier_label', a.get('tier'))}</td>"
+                    f"<td>{a.get('relaxation', 'none')}</td>"
+                    f"<td>{c.get('sampled', 0)}</td><td>{c.get('kept', 0)}</td><td>{c.get('invalid', 0)}</td><td>{c.get('duplicate', 0)}</td>"
+                    f"<td>{c.get('similarity_filtered', 0)}</td><td>{c.get('prob_filtered', 0)}</td><td>{c.get('delta_filtered', 0)}</td>"
+                    f"<td>{c.get('sa_filtered', 0)}</td><td>{c.get('logp_filtered', 0)}</td><td>{c.get('qed_filtered', 0)}</td><td>{c.get('alert_filtered', 0)}</td></tr>\n"
                 )
+            md.append("</table>\n")
     else:
         md.append("- Counterfactual diagnostics unavailable; see logs.\n")
 
     md.append("\n## Counterfactual suggestions (filtered)\n")
     if counterfactuals:
-        md.append("| Rank | Image | Tier | Relaxation | Similarity | p(toxic) | Δp | LogP | QED | SA |\n")
-        md.append("|---:|:---:|---|---|---:|---:|---:|---:|---:|---:|\n")
+        md.append("<table>\n")
+        md.append("<tr><th>Rank</th><th>Structure</th><th>Tier</th><th>Relaxation</th><th>Similarity</th><th>p(toxic)</th><th>Δp</th><th>LogP</th><th>QED</th><th>SA</th></tr>\n")
         for i, cf in enumerate(counterfactuals, start=1):
             img = f"cf_{i:02d}.png"
+            tier_label = cf.get("tier_label", cf.get("tier", ""))
             md.append(
-                f"| {i} | ![]({img}) | {cf.get('tier_label', cf.get('tier',''))} | {cf.get('relaxation','none')} | "
-                f"{cf['similarity']:.3f} | {cf['p']:.3f} | {cf['delta_p']:.3f} | "
-                f"{cf['logp']:.2f} | {cf['qed']:.2f} | {cf['sascore']:.2f} |\n"
+                f"<tr><td>{i}</td><td><img src=\"{img}\" width=\"260\"></td>"
+                f"<td>{tier_label}</td><td>{cf.get('relaxation','none')}</td>"
+                f"<td>{cf['similarity']:.3f}</td><td>{cf['p']:.3f}</td><td>{cf['delta_p']:.3f}</td>"
+                f"<td>{cf['logp']:.2f}</td><td>{cf['qed']:.2f}</td><td>{cf['sascore']:.2f}</td></tr>\n"
             )
-        md.append("\n### Raw counterfactual records\n")
-        md.append("```json\n")
-        md.append(json.dumps(counterfactuals, indent=2))
-        md.append("\n```\n")
+        md.append("</table>\n")
     else:
-        md.append("### No valid counterfactuals under medicinal constraints\n")
+        md.append("No candidates survived medicinal constraints. This does not mean the model is broken; it means local edits that reduce risk are rare under the current policy.\n")
         if cf_summary:
             md.append(f"- Total candidates sampled: {cf_summary.get('sampled', 'n/a')}\n")
             tiers_seen = [a.get("tier_label", a.get("tier")) for a in cf_summary.get("attempts", [])]
@@ -557,18 +582,27 @@ def write_lead_report(
 
     if dataset_analogues:
         md.append("\n## Dataset-derived analogues (fallback)\n")
-        md.append("_Selected from dataset by lowest predicted p(toxic) with similarity ≥0.3; used when generated counterfactuals are unavailable._\n")
-        md.append("| Rank | Image | Similarity | p(toxic) | Δp | LogP | QED | SA | Alerts |\n")
-        md.append("|---:|:---:|---:|---:|---:|---:|---:|---:|---:|\n")
+        md.append("_Nearest analogues from the dataset (context only, not generated edits)._ \n")
+        md.append("<table>\n")
+        md.append("<tr><th>Rank</th><th>Structure</th><th>Similarity</th><th>p(toxic)</th><th>Δp</th><th>LogP</th><th>QED</th><th>SA</th><th>Alerts</th></tr>\n")
         for i, ana in enumerate(dataset_analogues, start=1):
             img = f"ds_{i:02d}.png"
+            alerts = "ALERT" if ana.get("alert") else "OK"
             md.append(
-                f"| {i} | ![]({img}) | {ana['similarity']:.3f} | {ana['p']:.3f} | {ana['delta_p']:.3f} | "
-                f"{ana['logp']:.2f} | {ana['qed']:.2f} | {ana['sascore']:.2f} | {('⚠' if ana.get('alert') else 'OK')} |\n"
+                f"<tr><td>{i}</td><td><img src=\"{img}\" width=\"260\"></td>"
+                f"<td>{ana['similarity']:.3f}</td><td>{ana['p']:.3f}</td><td>{ana['delta_p']:.3f}</td>"
+                f"<td>{ana['logp']:.2f}</td><td>{ana['qed']:.2f}</td><td>{ana['sascore']:.2f}</td><td>{alerts}</td></tr>\n"
             )
-        md.append("\n### Raw analogue records\n")
-        md.append("```json\n")
-        md.append(json.dumps(dataset_analogues, indent=2))
-        md.append("\n```\n")
+        md.append("</table>\n")
+
+    md.append("\n## Raw records (for audit)\n")
+    md.append("### Counterfactuals JSON\n")
+    md.append("```json\n")
+    md.append(json.dumps(counterfactuals or [], indent=2))
+    md.append("\n```\n")
+    md.append("### Dataset analogues JSON\n")
+    md.append("```json\n")
+    md.append(json.dumps(dataset_analogues or [], indent=2))
+    md.append("\n```\n")
 
     (out_dir / "report.md").write_text("".join(md), encoding="utf-8")
