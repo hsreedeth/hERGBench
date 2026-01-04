@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+import inspect
 from rdkit import Chem, DataStructs
 from rdkit.Chem import Crippen, Draw, QED
 from rdkit.Chem.FilterCatalog import FilterCatalog, FilterCatalogParams
@@ -118,6 +119,11 @@ def dataset_analogues(
             continue
         props = mol_props(mol, cache_dir=fpscores_cache_dir)
         alert = has_structural_alerts(mol)
+        sa_val = props["sascore"]
+        sa_status = "ok" if sa_val < 9.99 else "failed"
+        if sa_status == "failed":
+            sa_val = float("nan")
+        actionable = (not alert) and (not np.isnan(sa_val)) and (sa_val <= 4.5) and ((base_p - float(p)) > 0)
         entries.append(
             {
                 "smiles": smi,
@@ -126,7 +132,9 @@ def dataset_analogues(
                 "delta_p": base_p - float(p),
                 "logp": props["logp"],
                 "qed": props["qed"],
-                "sascore": props["sascore"],
+                "sascore": sa_val,
+                "sa_status": sa_status,
+                "actionable": actionable,
                 "alert": alert,
                 "tier": "dataset_analogue",
                 "tier_label": "Dataset analogue",
@@ -231,26 +239,99 @@ def generate_counterfactuals_exmol(
     ]
     relaxation_steps.extend(validated_relaxations)
 
-    # ExMol expects a classifier f(smiles)->0/1 for counterfactual search.
-    space = exmol.sample_space(
-        base_smiles,
-        model_class,
-        batched=False,
-        preset=exmol_preset,
-        use_selfies=False,
-        quiet=True,
-        method_kwargs=None,  # cf_explain handles sampling budget; sample_space cannot accept nmols for some presets
+    def _sample_exmol_space_version_safe(
+        base: str,
+        cls_fn: Callable[[str], int],
+        preset: str,
+        budget: int,
+        logger_obj: Optional[Any],
+    ):
+        examples = []
+        err_msg = None
+        stoned_params_default = {"max_mutations": 1, "min_mutations": 1}
+        # Try to get alphabet if available
+        try:
+            stoned_params_default["alphabet"] = exmol.get_basic_alphabet()
+        except Exception:
+            stoned_params_default["alphabet"] = None
+        sig = inspect.signature(exmol.sample_space)
+        kwargs = {}
+        if "model_class" in sig.parameters:
+            kwargs["model_class"] = cls_fn
+        if "preset" in sig.parameters:
+            kwargs["preset"] = preset
+        if "batched" in sig.parameters:
+            kwargs["batched"] = False
+        if "use_selfies" in sig.parameters:
+            kwargs["use_selfies"] = False
+        if "quiet" in sig.parameters:
+            kwargs["quiet"] = True
+        # num_samples variants
+        for key in ["num_samples", "n_samples", "samples"]:
+            if key in sig.parameters:
+                kwargs[key] = budget
+                break
+        # method_kwargs
+        method_kwargs = {}
+        if stoned_params_default.get("max_mutations") is not None:
+            method_kwargs["max_mutations"] = stoned_params_default["max_mutations"]
+        if stoned_params_default.get("min_mutations") is not None:
+            method_kwargs["min_mutations"] = stoned_params_default["min_mutations"]
+        if stoned_params_default.get("alphabet") is not None:
+            method_kwargs["alphabet"] = stoned_params_default["alphabet"]
+        if "method_kwargs" in sig.parameters and method_kwargs:
+            kwargs["method_kwargs"] = method_kwargs
+        try:
+            space = exmol.sample_space(base, **kwargs)
+            if isinstance(space, tuple):
+                space = space[0]
+            examples = getattr(space, "examples", None) or getattr(space, "mols", None) or []
+            if isinstance(examples, dict):
+                examples = list(examples.values())
+        except TypeError as e:
+            err_msg = str(e)
+            # fallback to run_stoned if available
+            try:
+                from exmol.exmol import run_stoned  # type: ignore
+            except Exception:
+                try:
+                    run_stoned = getattr(exmol, "run_stoned")
+                except Exception:
+                    run_stoned = None
+            if run_stoned:
+                rs_sig = inspect.signature(run_stoned)
+                rs_kwargs = {}
+                for key in ["num_samples", "n_samples", "samples"]:
+                    if key in rs_sig.parameters:
+                        rs_kwargs[key] = budget
+                        break
+                if "max_mutations" in rs_sig.parameters:
+                    rs_kwargs["max_mutations"] = stoned_params_default.get("max_mutations", 1)
+                if "min_mutations" in rs_sig.parameters:
+                    rs_kwargs["min_mutations"] = stoned_params_default.get("min_mutations", 1)
+                if "alphabet" in rs_sig.parameters and stoned_params_default.get("alphabet") is not None:
+                    rs_kwargs["alphabet"] = stoned_params_default["alphabet"]
+                if "use_selfies" in rs_sig.parameters:
+                    rs_kwargs["use_selfies"] = False
+                try:
+                    examples = run_stoned(base, cls_fn, **rs_kwargs) or []
+                    err_msg = None
+                except Exception as e2:
+                    err_msg = f"{err_msg}; run_stoned fallback failed: {e2}"
+        except Exception as e:
+            err_msg = str(e)
+        return examples, err_msg
+
+    # Version-safe sampling (no cf_explain)
+    exmol_examples, sample_err = _sample_exmol_space_version_safe(
+        base=base_smiles, cls_fn=model_class, preset=exmol_preset, budget=sample_budget, logger_obj=logger
     )
-    if isinstance(space, tuple):
-        space = space[0]
+    candidates_raw = [ex for ex in exmol_examples if getattr(ex, "smiles", None)]
+    sample_count = len(candidates_raw)
+    if logger:
+        logger.info("ExMol requested num_samples=%d, sampled=%d (err=%s)", sample_budget, sample_count, sample_err)
 
-    # Counterfactual search (large pool; no early filtering).
-    cfs = exmol.cf_explain(space, nmols=sample_budget, filter_nondrug=False)
-    if isinstance(cfs, tuple):
-        cfs = cfs[0]
-
-    cfs = cfs or []
-    sample_count = len(cfs)
+    cfs = candidates_raw
 
     def _apply_relaxation(base_constraints: CFConstraints, updates: Dict[str, Any]) -> CFConstraints:
         # Only one constraint may change; field names match CFConstraints.
@@ -266,13 +347,17 @@ def generate_counterfactuals_exmol(
         kwargs.update({k: v for k, v in updates.items() if k in kwargs})
         return CFConstraints(**kwargs)
 
-    def _resolve_min_tanimoto(tier: Dict[str, Any], constraint_set: CFConstraints) -> float:
+    def _resolve_min_tanimoto(tier: Dict[str, Any], constraint_set: CFConstraints) -> Tuple[float, str]:
         base_min = constraint_set.min_tanimoto
         if tier["min_key"] == "flip":
-            cfg_min = constraint_set.min_tanimoto_flip if constraint_set.min_tanimoto_flip is not None else base_min
+            source = "min_tanimoto_flip" if constraint_set.min_tanimoto_flip is not None else "tier_default"
+            cfg_min = constraint_set.min_tanimoto_flip if constraint_set.min_tanimoto_flip is not None else tier["default_min_tanimoto"]
         else:
-            cfg_min = constraint_set.min_tanimoto_improve if constraint_set.min_tanimoto_improve is not None else base_min
-        return max(tier["default_min_tanimoto"], cfg_min)
+            source = "min_tanimoto_improve" if constraint_set.min_tanimoto_improve is not None else "tier_default"
+            cfg_min = constraint_set.min_tanimoto_improve if constraint_set.min_tanimoto_improve is not None else tier["default_min_tanimoto"]
+        # optional global floor for backward compatibility
+        min_sim = max(cfg_min, base_min) if base_min is not None else cfg_min
+        return min_sim, source
 
     def _filter_candidates(
         tier: Dict[str, Any],
@@ -280,7 +365,7 @@ def generate_counterfactuals_exmol(
         relaxation_name: str,
         relaxation_desc: str,
     ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-        min_sim = _resolve_min_tanimoto(tier, constraint_set)
+        min_sim, min_source = _resolve_min_tanimoto(tier, constraint_set)
         counts = {
             "sampled": sample_count,
             "invalid": 0,
@@ -294,6 +379,7 @@ def generate_counterfactuals_exmol(
             "alert_filtered": 0,
             "kept": 0,
             "min_tanimoto_used": min_sim,
+            "min_tanimoto_source": min_source,
             "prob_max_used": tier["prob_max"],
             "delta_min_used": tier["delta_min"] if tier["require_delta"] else None,
             "sa_max_used": constraint_set.sa_max,
@@ -435,6 +521,51 @@ def generate_counterfactuals_exmol(
                 relaxation_used = True
                 break
 
+    # Tier 4 diagnostic fallback: closest edits from sampled space if nothing survived.
+    if not final_rows and cfs:
+        diag_rows: List[Dict[str, Any]] = []
+        seen_diag = set()
+        for ex in cfs:
+            smi = getattr(ex, "smiles", None)
+            if not smi or smi == base_smiles:
+                continue
+            mol = Chem.MolFromSmiles(smi)
+            if mol is None:
+                continue
+            try:
+                Chem.SanitizeMol(mol)
+            except Exception:
+                continue
+            smi_canon = Chem.MolToSmiles(mol, canonical=True)
+            if smi_canon in seen_diag:
+                continue
+            seen_diag.add(smi_canon)
+            fp = mol_to_ecfp_bits(mol, fp_cfg)
+            sim = float(DataStructs.TanimotoSimilarity(fp_base, fp))
+            props = mol_props(mol, cache_dir=fpscores_cache_dir)
+            alert = has_structural_alerts(mol) if constraints.pains else False
+            diag_rows.append(
+                {
+                    "smiles": smi,
+                    "similarity": sim,
+                    "p": float(model_prob(smi)),
+                    "delta_p": p_base - float(model_prob(smi)),
+                    "logp": props["logp"],
+                    "qed": props["qed"],
+                    "sascore": props["sascore"],
+                    "alert": alert,
+                    "tier": "diagnostic_close_edits",
+                    "tier_label": "Tier 4 — Closest edits (diagnostic)",
+                    "relaxation": "none",
+                    "relaxation_desc": "diagnostic fallback (no valid improvements found)",
+                }
+            )
+        diag_rows.sort(key=lambda r: r["similarity"], reverse=True)
+        final_rows = diag_rows[:nmols]
+        final_tier = "diagnostic_close_edits"
+        final_relaxation = "none"
+        final_relaxation_desc = "diagnostic fallback (no valid improvements found)"
+
     # rank: high risk drop then high similarity to prefer meaningful and close suggestions
     final_rows.sort(key=lambda r: (r["delta_p"], r["similarity"]), reverse=True)
     final_rows = final_rows[:nmols]
@@ -442,6 +573,7 @@ def generate_counterfactuals_exmol(
     diag = {
         "sampled": sample_count,
         "sample_budget": sample_budget,
+        "sample_error": sample_err,
         "target_prob_max": float(safe_prob_max),
         "attempts": attempts,
         "final_tier": final_tier,
@@ -530,20 +662,23 @@ def write_lead_report(
         relaxation_used = bool(cf_summary.get("relaxation_used", False))
         scarcity = bool(cf_summary.get("scarcity", False))
         fallback_used = bool(dataset_analogues)
-        md.append(f"- ExMol sample budget: {sample_budget} (drawn: {sampled})\n")
-        md.append(f"- Tier used: {final_tier_label if final_tier != 'none' else 'None'} (relaxation: {final_relax if final_relax else 'none'})\n")
+        md.append(f"- ExMol requested: {sample_budget} | drawn: {sampled}\n")
+        md.append(f"- Final tier: {final_tier_label if len(counterfactuals) > 0 and final_tier != 'none' else 'None'} (relaxation: {final_relax if final_relax else 'none'})\n")
         md.append(f"- Relaxation used: {relaxation_used}\n")
-        md.append(f"- Survivors after filtering: {cf_summary.get('final_count', 0)}\n")
-        md.append(f"- Dataset analogue fallback used: {fallback_used}\n")
+        md.append(f"- Generated survivors: {len(counterfactuals)}\n")
+        md.append(f"- Dataset analogue fallback count: {len(dataset_analogues or [])}\n")
         if scarcity:
             md.append("- Scarcity: No candidates survived medicinal constraints.\n")
         if cf_summary.get("final_relaxation_desc"):
             md.append(f"- Relaxation note: {cf_summary.get('final_relaxation_desc')}\n")
         if attempts:
-            md.append("\n### Filter attrition by tier\n")
+            winner_relax = final_relax if final_relax else "none"
+            md.append("\n### Filter attrition by tier (baseline + final relaxation)\n")
             md.append("<table>\n")
             md.append("<tr><th>Tier</th><th>Relaxation</th><th>Sampled</th><th>Kept</th><th>Invalid</th><th>Duplicate</th><th>Similarity</th><th>Prob</th><th>Δp</th><th>SA</th><th>ΔLogP</th><th>QED</th><th>Alerts</th></tr>\n")
             for a in attempts:
+                if a.get("relaxation") not in ("none", winner_relax):
+                    continue
                 c = a.get("counts", {})
                 md.append(
                     f"<tr><td>{a.get('tier_label', a.get('tier'))}</td>"
@@ -553,6 +688,11 @@ def write_lead_report(
                     f"<td>{c.get('sa_filtered', 0)}</td><td>{c.get('logp_filtered', 0)}</td><td>{c.get('qed_filtered', 0)}</td><td>{c.get('alert_filtered', 0)}</td></tr>\n"
                 )
             md.append("</table>\n")
+            md.append("\n<details><summary>All filter attempts (diagnostic)</summary>\n")
+            md.append("```json\n")
+            md.append(json.dumps(attempts, indent=2))
+            md.append("\n```\n")
+            md.append("</details>\n")
     else:
         md.append("- Counterfactual diagnostics unavailable; see logs.\n")
 
@@ -563,6 +703,7 @@ def write_lead_report(
         for i, cf in enumerate(counterfactuals, start=1):
             img = f"cf_{i:02d}.png"
             tier_label = cf.get("tier_label", cf.get("tier", ""))
+            alert_flag = "⚠" if cf.get("alert") else "OK"
             md.append(
                 f"<tr><td>{i}</td><td><img src=\"{img}\" width=\"260\"></td>"
                 f"<td>{tier_label}</td><td>{cf.get('relaxation','none')}</td>"
@@ -584,16 +725,21 @@ def write_lead_report(
         md.append("\n## Dataset-derived analogues (fallback)\n")
         md.append("_Nearest analogues from the dataset (context only, not generated edits)._ \n")
         md.append("<table>\n")
-        md.append("<tr><th>Rank</th><th>Structure</th><th>Similarity</th><th>p(toxic)</th><th>Δp</th><th>LogP</th><th>QED</th><th>SA</th><th>Alerts</th></tr>\n")
+        md.append("<tr><th>Rank</th><th>Structure</th><th>Similarity</th><th>p(toxic)</th><th>Δp</th><th>LogP</th><th>QED</th><th>SA</th><th>Alerts</th><th>Actionable?</th></tr>\n")
         for i, ana in enumerate(dataset_analogues, start=1):
             img = f"ds_{i:02d}.png"
-            alerts = "ALERT" if ana.get("alert") else "OK"
+            alerts = "⚠" if ana.get("alert") else "OK"
+            sa_val = ana["sascore"]
+            sa_display = "NA" if np.isnan(sa_val) else f"{sa_val:.2f}"
+            actionable = "YES" if ana.get("actionable") else "NO"
             md.append(
                 f"<tr><td>{i}</td><td><img src=\"{img}\" width=\"260\"></td>"
                 f"<td>{ana['similarity']:.3f}</td><td>{ana['p']:.3f}</td><td>{ana['delta_p']:.3f}</td>"
-                f"<td>{ana['logp']:.2f}</td><td>{ana['qed']:.2f}</td><td>{ana['sascore']:.2f}</td><td>{alerts}</td></tr>\n"
+                f"<td>{ana['logp']:.2f}</td><td>{ana['qed']:.2f}</td><td>{sa_display}</td><td>{alerts}</td><td>{actionable}</td></tr>\n"
             )
         md.append("</table>\n")
+        if all(not ana.get("actionable") for ana in dataset_analogues):
+            md.append("Fallback analogues are context-only; none meet feasibility constraints.\n")
 
     md.append("\n## Raw records (for audit)\n")
     md.append("### Counterfactuals JSON\n")

@@ -15,6 +15,7 @@ src/hergbench/features/fingerprints.py
 src/hergbench/models/__init__.py
 src/hergbench/models/xgb_optuna.py
 src/hergbench/reporting/__init__.py
+src/hergbench/reporting/cf_smoke_test.py
 src/hergbench/reporting/lead_opt.py
 src/hergbench/reporting/sascorer.py
 src/hergbench/utils/__init__.py
@@ -27,3 +28,4 @@ src/hergbench_tdc.egg-info/dependency_links.txt
 src/hergbench_tdc.egg-info/entry_points.txt
 src/hergbench_tdc.egg-info/requires.txt
 src/hergbench_tdc.egg-info/top_level.txt
+tests/test_lead_opt.py
