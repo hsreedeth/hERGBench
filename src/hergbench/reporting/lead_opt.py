@@ -239,99 +239,77 @@ def generate_counterfactuals_exmol(
     ]
     relaxation_steps.extend(validated_relaxations)
 
-    def _sample_exmol_space_version_safe(
+    def _exmol_f(x, *args):
+        """Wrapper matching ExMol expectations for batched scoring."""
+        if isinstance(x, list):
+            return [float(model_prob(s)) for s in x]
+        return [float(model_prob(str(x)))]
+
+    def _exmol_sample_space(
         base: str,
-        cls_fn: Callable[[str], int],
         preset: str,
         budget: int,
-        logger_obj: Optional[Any],
-    ):
-        examples = []
-        err_msg = None
-        stoned_params_default = {"max_mutations": 1, "min_mutations": 1}
-        # Try to get alphabet if available
+    ) -> Tuple[List[Any], Optional[str]]:
+        err_msg: Optional[str] = None
+        examples: List[Any] = []
+        # Constrain STONED to local edits; modest expansion if large budget.
+        max_mut = 2 if budget >= 1500 else 1
+        stoned_params: Dict[str, Any] = {"min_mutations": 1, "max_mutations": max_mut}
         try:
-            stoned_params_default["alphabet"] = exmol.get_basic_alphabet()
+            stoned_params["alphabet"] = exmol.get_basic_alphabet()
         except Exception:
-            stoned_params_default["alphabet"] = None
-        sig = inspect.signature(exmol.sample_space)
-        kwargs = {}
-        if "model_class" in sig.parameters:
-            kwargs["model_class"] = cls_fn
-        if "preset" in sig.parameters:
-            kwargs["preset"] = preset
-        if "batched" in sig.parameters:
-            kwargs["batched"] = False
-        if "use_selfies" in sig.parameters:
-            kwargs["use_selfies"] = False
-        if "quiet" in sig.parameters:
-            kwargs["quiet"] = True
-        # num_samples variants
-        for key in ["num_samples", "n_samples", "samples"]:
-            if key in sig.parameters:
-                kwargs[key] = budget
-                break
-        # method_kwargs
-        method_kwargs = {}
-        if stoned_params_default.get("max_mutations") is not None:
-            method_kwargs["max_mutations"] = stoned_params_default["max_mutations"]
-        if stoned_params_default.get("min_mutations") is not None:
-            method_kwargs["min_mutations"] = stoned_params_default["min_mutations"]
-        if stoned_params_default.get("alphabet") is not None:
-            method_kwargs["alphabet"] = stoned_params_default["alphabet"]
-        if "method_kwargs" in sig.parameters and method_kwargs:
-            kwargs["method_kwargs"] = method_kwargs
+            pass
         try:
-            space = exmol.sample_space(base, **kwargs)
+            space = exmol.sample_space(
+                origin_smiles=base,
+                f=_exmol_f,
+                batched=True,
+                preset=preset,
+                method_kwargs=stoned_params,
+                num_samples=budget,
+                stoned_kwargs=None,
+                quiet=True,
+                use_selfies=False,
+                sanitize_smiles=True,
+            )
             if isinstance(space, tuple):
                 space = space[0]
-            examples = getattr(space, "examples", None) or getattr(space, "mols", None) or []
-            if isinstance(examples, dict):
-                examples = list(examples.values())
-        except TypeError as e:
-            err_msg = str(e)
-            # fallback to run_stoned if available
-            try:
-                from exmol.exmol import run_stoned  # type: ignore
-            except Exception:
-                try:
-                    run_stoned = getattr(exmol, "run_stoned")
-                except Exception:
-                    run_stoned = None
-            if run_stoned:
-                rs_sig = inspect.signature(run_stoned)
-                rs_kwargs = {}
-                for key in ["num_samples", "n_samples", "samples"]:
-                    if key in rs_sig.parameters:
-                        rs_kwargs[key] = budget
-                        break
-                if "max_mutations" in rs_sig.parameters:
-                    rs_kwargs["max_mutations"] = stoned_params_default.get("max_mutations", 1)
-                if "min_mutations" in rs_sig.parameters:
-                    rs_kwargs["min_mutations"] = stoned_params_default.get("min_mutations", 1)
-                if "alphabet" in rs_sig.parameters and stoned_params_default.get("alphabet") is not None:
-                    rs_kwargs["alphabet"] = stoned_params_default["alphabet"]
-                if "use_selfies" in rs_sig.parameters:
-                    rs_kwargs["use_selfies"] = False
-                try:
-                    examples = run_stoned(base, cls_fn, **rs_kwargs) or []
-                    err_msg = None
-                except Exception as e2:
-                    err_msg = f"{err_msg}; run_stoned fallback failed: {e2}"
+            if isinstance(space, list):
+                examples = list(space)
+            elif getattr(space, "examples", None) is not None:
+                examples = list(getattr(space, "examples"))
+            elif getattr(space, "mols", None) is not None:
+                examples = list(getattr(space, "mols"))
         except Exception as e:
             err_msg = str(e)
+            examples = []
         return examples, err_msg
 
-    # Version-safe sampling (no cf_explain)
-    exmol_examples, sample_err = _sample_exmol_space_version_safe(
-        base=base_smiles, cls_fn=model_class, preset=exmol_preset, budget=sample_budget, logger_obj=logger
+    # ExMol sampling from sample_space; no cf_explain used for the pool.
+    examples, sample_err = _exmol_sample_space(
+        base=base_smiles, preset=exmol_preset, budget=sample_budget
     )
-    candidates_raw = [ex for ex in exmol_examples if getattr(ex, "smiles", None)]
-    sample_count = len(candidates_raw)
+    sample_count = len(examples)
     if logger:
         logger.info("ExMol requested num_samples=%d, sampled=%d (err=%s)", sample_budget, sample_count, sample_err)
 
-    cfs = candidates_raw
+    if sample_err and sample_count == 0:
+        diag = {
+            "sampled": 0,
+            "sample_budget": sample_budget,
+            "sample_error": sample_err,
+            "target_prob_max": float(safe_prob_max),
+            "attempts": [],
+            "final_tier": "error",
+            "final_tier_label": "error",
+            "final_relaxation": "none",
+            "final_relaxation_desc": "sampling failed",
+            "relaxation_used": False,
+            "final_count": 0,
+            "scarcity": True,
+            "error": sample_err,
+        }
+        return [], diag
 
     def _apply_relaxation(base_constraints: CFConstraints, updates: Dict[str, Any]) -> CFConstraints:
         # Only one constraint may change; field names match CFConstraints.
@@ -389,8 +367,10 @@ def generate_counterfactuals_exmol(
         }
         rows: List[Dict[str, Any]] = []
         seen = set()
-        for ex in cfs:
+        for ex in examples:
             smi = getattr(ex, "smiles", None)
+            if smi is None and isinstance(ex, dict):
+                smi = ex.get("smiles")
             if not smi or smi == base_smiles:
                 counts["invalid"] += 1
                 continue
@@ -522,11 +502,13 @@ def generate_counterfactuals_exmol(
                 break
 
     # Tier 4 diagnostic fallback: closest edits from sampled space if nothing survived.
-    if not final_rows and cfs:
+    if not final_rows and examples:
         diag_rows: List[Dict[str, Any]] = []
         seen_diag = set()
-        for ex in cfs:
+        for ex in examples:
             smi = getattr(ex, "smiles", None)
+            if smi is None and isinstance(ex, dict):
+                smi = ex.get("smiles")
             if not smi or smi == base_smiles:
                 continue
             mol = Chem.MolFromSmiles(smi)
