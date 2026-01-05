@@ -98,11 +98,13 @@ def dataset_analogues(
     dataset_smiles: List[str],
     dataset_fps,
     dataset_probs: List[float],
-    fp_cfg: FingerprintConfig,
+    fp_cfg: Optional[FingerprintConfig],
+    constraints: Optional[CFConstraints] = None,
     top_k: int = 5,
     min_sim: float = 0.3,
     fpscores_cache_dir: Optional[Path] = None,
 ) -> List[Dict[str, Any]]:
+
     """Return dataset-derived analogues (lowest predicted risk, similar to base).
 
     If no molecules meet min_sim, fall back to top_k by similarity regardless of p.
@@ -118,12 +120,21 @@ def dataset_analogues(
         except Exception:
             continue
         props = mol_props(mol, cache_dir=fpscores_cache_dir)
-        alert = has_structural_alerts(mol)
-        sa_val = props["sascore"]
-        sa_status = "ok" if sa_val < 9.99 else "failed"
-        if sa_status == "failed":
+
+        # Use the same medicinal policy as CFConstraints when provided.
+        sa_cutoff = float(constraints.sa_max) if constraints is not None else 4.5
+        use_pains = bool(constraints.pains) if constraints is not None else True
+
+        alert = has_structural_alerts(mol) if use_pains else False
+        sa_val = float(props["sascore"])
+
+        # Keep "failed" only for truly invalid SA; otherwise keep the numeric value for reporting.
+        sa_status = "ok" if np.isfinite(sa_val) else "failed"
+        if not np.isfinite(sa_val):
             sa_val = float("nan")
-        actionable = (not alert) and (not np.isnan(sa_val)) and (sa_val <= 4.5) and ((base_p - float(p)) > 0)
+
+        actionable = (not alert) and (not np.isnan(sa_val)) and (sa_val <= sa_cutoff) and ((base_p - float(p)) > 0)
+
         entries.append(
             {
                 "smiles": smi,
@@ -140,6 +151,8 @@ def dataset_analogues(
                 "tier_label": "Dataset analogue",
                 "relaxation": "none",
                 "relaxation_desc": "dataset fallback",
+                "sa_max_used": sa_cutoff,
+                "pains_used": use_pains,
             }
         )
 
@@ -181,7 +194,15 @@ def generate_counterfactuals_exmol(
 
     # Enforce a large ExMol budget (bounded) to give rare counterfactuals a chance under strict medicinal filters.
     sample_budget = int(search_nmols if search_nmols is not None else exmol_n_samples)
-    sample_budget = min(max(sample_budget, 1500), 2000)
+
+    # Production guardrail: enforce a large budget only when user did not explicitly override with search_nmols.
+    # This keeps real runs robust, but allows small debug/pytest runs to request small budgets.
+    if search_nmols is None:
+        sample_budget = min(max(sample_budget, 1500), 2000)
+    else:
+        # Still enforce basic sanity bounds for explicit overrides
+        sample_budget = max(sample_budget, 1)
+
 
     base_props = mol_props(mol_base, cache_dir=fpscores_cache_dir)
     fp_base = mol_to_ecfp_bits(mol_base, fp_cfg)
@@ -245,53 +266,228 @@ def generate_counterfactuals_exmol(
             return [float(model_prob(s)) for s in x]
         return [float(model_prob(str(x)))]
 
-    def _exmol_sample_space(
-        base: str,
-        preset: str,
-        budget: int,
-    ) -> Tuple[List[Any], Optional[str]]:
+    # def _exmol_sample_space(
+    #     base: str,
+    #     preset: str,
+    #     budget: int,
+    # ) -> Tuple[List[Any], Optional[str]]:
+    #     err_msg: Optional[str] = None
+    #     examples: List[Any] = []
+    #     try:
+    #         sig = inspect.signature(exmol.sample_space)
+    #     except Exception:
+    #         sig = None
+
+    #     method_kwargs: Dict[str, Any] = {"min_mutations": 1, "max_mutations": 1}
+    #     try:
+    #         method_kwargs["alphabet"] = exmol.get_basic_alphabet()
+    #     except Exception:
+    #         pass
+
+    #     call_kwargs: Dict[str, Any] = {}
+
+    #     def _maybe_add(name: str, value: Any) -> None:
+    #         if sig is None or name in sig.parameters:
+    #             call_kwargs[name] = value
+
+    #     if sig is None:
+    #         call_kwargs["origin_smiles"] = base
+    #     else:
+    #         if "origin_smiles" in sig.parameters:
+    #             call_kwargs["origin_smiles"] = base
+    #         elif "smiles" in sig.parameters:
+    #             call_kwargs["smiles"] = base
+    #         elif "base" in sig.parameters:
+    #             call_kwargs["base"] = base
+    #         else:
+    #             first = next(iter(sig.parameters))
+    #             call_kwargs[first] = base
+
+        
+
+
+    #     _maybe_add("f", _exmol_f)
+    #     _maybe_add("batched", True)
+    #     _maybe_add("preset", preset)
+    #     _maybe_add("method_kwargs", method_kwargs)
+    #     _maybe_add("num_samples", budget)
+    #     _maybe_add("quiet", True)
+    #     _maybe_add("use_selfies", False)
+    #     _maybe_add("sanitize_smiles", True)
+
+    #     try:
+    #         space = exmol.sample_space(**call_kwargs)
+    #         if isinstance(space, tuple):
+    #             space = space[0]
+    #         if isinstance(space, list):
+    #             examples = list(space)
+    #         elif getattr(space, "examples", None) is not None:
+    #             examples = list(getattr(space, "examples"))
+    #         elif getattr(space, "mols", None) is not None:
+    #             examples = list(getattr(space, "mols"))
+    #     except Exception as e:
+    #         err_msg = str(e)
+    #         examples = []
+    #     return examples, err_msg
+
+    # # ExMol sampling from sample_space; no cf_explain used for the pool.
+    # examples, sample_err = _exmol_sample_space(
+    #     base=base_smiles, preset=exmol_preset, budget=sample_budget
+    # )
+    # sample_count = len(examples)
+    # if logger:
+    #     logger.info("ExMol requested num_samples=%d, sampled=%d (err=%s)", sample_budget, sample_count, sample_err)
+
+    # if sample_err and sample_count == 0:
+    #     diag = {
+    #         "sampled": 0,
+    #         "sample_budget": sample_budget,
+    #         "sample_error": sample_err,
+    #         "target_prob_max": float(safe_prob_max),
+    #         "attempts": [],
+    #         "final_tier": "error",
+    #         "final_tier_label": "error",
+    #         "final_relaxation": "none",
+    #         "final_relaxation_desc": "sampling failed",
+    #         "relaxation_used": False,
+    #         "final_count": 0,
+    #         "scarcity": True,
+    #         "error": sample_err,
+    #     }
+    #     return [], diag
+
+    def _exmol_sample_space(base: str, preset: str, budget: int) -> Tuple[List[Any], Optional[str]]:
         err_msg: Optional[str] = None
         examples: List[Any] = []
-        # Constrain STONED to local edits; modest expansion if large budget.
-        max_mut = 2 if budget >= 1500 else 1
-        stoned_params: Dict[str, Any] = {"min_mutations": 1, "max_mutations": max_mut}
+
         try:
-            stoned_params["alphabet"] = exmol.get_basic_alphabet()
+            sig = inspect.signature(exmol.sample_space)
+        except Exception:
+            sig = None
+
+        method_kwargs: Dict[str, Any] = {"min_mutations": 1, "max_mutations": 1}
+        try:
+            method_kwargs["alphabet"] = exmol.get_basic_alphabet()
         except Exception:
             pass
+
+        base_kwargs: Dict[str, Any] = {}
+
+        def _maybe_add(name: str, value: Any) -> None:
+            if sig is None or name in sig.parameters:
+                base_kwargs[name] = value
+
+        # scorer callable name
+        if sig is None:
+            base_kwargs["f"] = _exmol_f
+        else:
+            if "f" in sig.parameters:
+                base_kwargs["f"] = _exmol_f
+            elif "model_class" in sig.parameters:
+                base_kwargs["model_class"] = _exmol_f
+            elif "model" in sig.parameters:
+                base_kwargs["model"] = _exmol_f
+
+        _maybe_add("batched", True)
+        _maybe_add("preset", preset)
+        _maybe_add("method_kwargs", method_kwargs)
+        _maybe_add("quiet", True)
+        _maybe_add("use_selfies", False)
+        _maybe_add("sanitize_smiles", True)
+
+        # budget arg
+        if sig is None:
+            base_kwargs["num_samples"] = budget
+        else:
+            if "num_samples" in sig.parameters:
+                base_kwargs["num_samples"] = budget
+            elif "nmols" in sig.parameters:
+                base_kwargs["nmols"] = budget
+
+        # base-smiles arg key candidates
+        if sig is None:
+            base_keys = ["origin_smiles", "smiles", "base"]
+        else:
+            if "origin_smiles" in sig.parameters:
+                base_keys = ["origin_smiles"]
+            elif "smiles" in sig.parameters:
+                base_keys = ["smiles"]
+            elif "base" in sig.parameters:
+                base_keys = ["base"]
+            else:
+                base_keys = [next(iter(sig.parameters))]
+
+        last_type_error: Optional[Exception] = None
+
         try:
-            space = exmol.sample_space(
-                origin_smiles=base,
-                f=_exmol_f,
-                batched=True,
-                preset=preset,
-                method_kwargs=stoned_params,
-                num_samples=budget,
-                stoned_kwargs=None,
-                quiet=True,
-                use_selfies=False,
-                sanitize_smiles=True,
-            )
+            space = None
+            for k in base_keys:
+                try:
+                    call_kwargs = dict(base_kwargs)
+                    call_kwargs[k] = base
+                    space = exmol.sample_space(**call_kwargs)
+                    break
+                except TypeError as e:
+                    last_type_error = e
+                    continue
+
+            if space is None:
+                raise last_type_error if last_type_error is not None else RuntimeError("ExMol sample_space failed")
+
+            # normalize common return shapes
             if isinstance(space, tuple):
                 space = space[0]
+
+            # try to extract examples directly
             if isinstance(space, list):
                 examples = list(space)
             elif getattr(space, "examples", None) is not None:
                 examples = list(getattr(space, "examples"))
             elif getattr(space, "mols", None) is not None:
                 examples = list(getattr(space, "mols"))
+            else:
+                examples = []
+
+            # fallback: cf_explain if we still have nothing but have a space object
+            if not examples and hasattr(exmol, "cf_explain"):
+                try:
+                    cf_sig = inspect.signature(exmol.cf_explain)
+                except Exception:
+                    cf_sig = None
+
+                cf_kwargs: Dict[str, Any] = {}
+                if cf_sig is None or "nmols" in getattr(cf_sig, "parameters", {}):
+                    cf_kwargs["nmols"] = budget
+                if cf_sig is None or "filter_nondrug" in getattr(cf_sig, "parameters", {}):
+                    cf_kwargs["filter_nondrug"] = False
+
+                explained = exmol.cf_explain(space, **cf_kwargs)
+
+                if isinstance(explained, list):
+                    examples = list(explained)
+                elif getattr(explained, "examples", None) is not None:
+                    examples = list(getattr(explained, "examples"))
+                else:
+                    examples = []
+
         except Exception as e:
             err_msg = str(e)
             examples = []
+
         return examples, err_msg
 
-    # ExMol sampling from sample_space; no cf_explain used for the pool.
-    examples, sample_err = _exmol_sample_space(
-        base=base_smiles, preset=exmol_preset, budget=sample_budget
-    )
+
+    # ExMol sampling from sample_space; prefer direct examples, but allow cf_explain fallback.
+    examples, sample_err = _exmol_sample_space(base=base_smiles, preset=exmol_preset, budget=sample_budget)
     sample_count = len(examples)
+
     if logger:
-        logger.info("ExMol requested num_samples=%d, sampled=%d (err=%s)", sample_budget, sample_count, sample_err)
+        logger.info(
+            "ExMol requested budget=%d, sampled=%d (err=%s)",
+            sample_budget,
+            sample_count,
+            sample_err,
+        )
 
     if sample_err and sample_count == 0:
         diag = {
@@ -311,6 +507,7 @@ def generate_counterfactuals_exmol(
         }
         return [], diag
 
+
     def _apply_relaxation(base_constraints: CFConstraints, updates: Dict[str, Any]) -> CFConstraints:
         # Only one constraint may change; field names match CFConstraints.
         kwargs = {
@@ -325,17 +522,31 @@ def generate_counterfactuals_exmol(
         kwargs.update({k: v for k, v in updates.items() if k in kwargs})
         return CFConstraints(**kwargs)
 
-    def _resolve_min_tanimoto(tier: Dict[str, Any], constraint_set: CFConstraints) -> Tuple[float, str]:
-        base_min = constraint_set.min_tanimoto
+    # def _resolve_min_tanimoto(tier: Dict[str, Any], constraint_set: CFConstraints) -> Tuple[float, str]:
+    #     base_min = constraint_set.min_tanimoto
+    #     if tier["min_key"] == "flip":
+    #         source = "min_tanimoto_flip" if constraint_set.min_tanimoto_flip is not None else "tier_default"
+    #         cfg_min = constraint_set.min_tanimoto_flip if constraint_set.min_tanimoto_flip is not None else tier["default_min_tanimoto"]
+    #     else:
+    #         source = "min_tanimoto_improve" if constraint_set.min_tanimoto_improve is not None else "tier_default"
+    #         cfg_min = constraint_set.min_tanimoto_improve if constraint_set.min_tanimoto_improve is not None else tier["default_min_tanimoto"]
+    #     # optional global floor for backward compatibility
+    #     min_sim = max(cfg_min, base_min) if base_min is not None else cfg_min
+    #     return min_sim, source
+
+    def _resolve_min_tanimoto(tier, constraint_set):
         if tier["min_key"] == "flip":
-            source = "min_tanimoto_flip" if constraint_set.min_tanimoto_flip is not None else "tier_default"
-            cfg_min = constraint_set.min_tanimoto_flip if constraint_set.min_tanimoto_flip is not None else tier["default_min_tanimoto"]
+            if constraint_set.min_tanimoto_flip is not None:
+                return constraint_set.min_tanimoto_flip, "min_tanimoto_flip"
+            if constraint_set.min_tanimoto is not None:
+                return constraint_set.min_tanimoto, "min_tanimoto (legacy)"
+            return tier["default_min_tanimoto"], "tier_default"
         else:
-            source = "min_tanimoto_improve" if constraint_set.min_tanimoto_improve is not None else "tier_default"
-            cfg_min = constraint_set.min_tanimoto_improve if constraint_set.min_tanimoto_improve is not None else tier["default_min_tanimoto"]
-        # optional global floor for backward compatibility
-        min_sim = max(cfg_min, base_min) if base_min is not None else cfg_min
-        return min_sim, source
+            if constraint_set.min_tanimoto_improve is not None:
+                return constraint_set.min_tanimoto_improve, "min_tanimoto_improve"
+            if constraint_set.min_tanimoto is not None:
+                return constraint_set.min_tanimoto, "min_tanimoto (legacy)"
+            return tier["default_min_tanimoto"], "tier_default"
 
     def _filter_candidates(
         tier: Dict[str, Any],
@@ -446,62 +657,57 @@ def generate_counterfactuals_exmol(
     attempts: List[Dict[str, Any]] = []
     final_rows: List[Dict[str, Any]] = []
     final_tier = "none"
-    final_relaxation = "none"
-    final_relaxation_desc = "baseline constraints"
-
-    def _run_tiers(
-        active_constraints: CFConstraints, relaxation_name: str, relaxation_desc: str
-    ) -> Tuple[List[Dict[str, Any]], str, str]:
-        nonlocal attempts
-        for tier in tier_specs:
-            rows, counts = _filter_candidates(tier, active_constraints, relaxation_name, relaxation_desc)
-            attempts.append(
-                {
-                    "tier": tier["name"],
-                    "tier_label": tier["label"],
-                    "relaxation": relaxation_name,
-                    "relaxation_desc": relaxation_desc,
-                    "counts": counts,
-                }
-            )
-            if logger:
-                logger.info(
-                    "CF filtering %s (%s): %s",
-                    tier["name"],
-                    relaxation_name or "none",
-                    counts,
-                )
-            if rows:
-                return rows, tier["name"], tier["label"]
-        return [], "none", ""
-
-    # Baseline tiers
-    final_rows, final_tier, final_tier_label = _run_tiers(
-        constraints, relaxation_name="none", relaxation_desc="baseline constraints"
-    )
-
-    # Controlled single-constraint relaxation attempts, if configured and no hits yet.
+    final_tier_label = ""
     final_relaxation = "none"
     final_relaxation_desc = "baseline constraints"
     relaxation_used = False
-    if not final_rows:
+
+    def _record_attempt(tier: Dict[str, Any], relaxation_name: str, relaxation_desc: str, counts: Dict[str, Any]) -> None:
+        attempts.append(
+            {
+                "tier": tier["name"],
+                "tier_label": tier["label"],
+                "relaxation": relaxation_name,
+                "relaxation_desc": relaxation_desc,
+                "counts": counts,
+            }
+        )
+        if logger:
+            logger.info(
+                "CF filtering %s (%s): %s",
+                tier["name"],
+                relaxation_name or "none",
+                counts,
+            )
+
+    # Search order: Tier 1–3 under baseline constraints, then per-tier relaxations; Tier 4 only if all fail.
+    for tier in tier_specs:
+        rows, counts = _filter_candidates(tier, constraints, "none", "baseline constraints")
+        _record_attempt(tier, "none", "baseline constraints", counts)
+        if rows:
+            final_rows = rows
+            final_tier = tier["name"]
+            final_tier_label = tier["label"]
+            final_relaxation = "none"
+            final_relaxation_desc = "baseline constraints"
+            break
+
         for step in relaxation_steps:
             relaxed_constraints = _apply_relaxation(constraints, step["updates"])
-            rows, tier_name, tier_label = _run_tiers(
-                relaxed_constraints,
-                relaxation_name=step["name"],
-                relaxation_desc=step["description"],
-            )
+            rows, counts = _filter_candidates(tier, relaxed_constraints, step["name"], step["description"])
+            _record_attempt(tier, step["name"], step["description"], counts)
             if rows:
                 final_rows = rows
-                final_tier = tier_name
-                final_tier_label = tier_label
+                final_tier = tier["name"]
+                final_tier_label = tier["label"]
                 final_relaxation = step["name"]
                 final_relaxation_desc = step["description"]
                 relaxation_used = True
                 break
+        if final_rows:
+            break
 
-    # Tier 4 diagnostic fallback: closest edits from sampled space if nothing survived.
+    # Tier 4 diagnostic fallback: closest edits from sampled space if nothing survived Tier 1–3 with or without relaxations.
     if not final_rows and examples:
         diag_rows: List[Dict[str, Any]] = []
         seen_diag = set()
@@ -545,6 +751,7 @@ def generate_counterfactuals_exmol(
         diag_rows.sort(key=lambda r: r["similarity"], reverse=True)
         final_rows = diag_rows[:nmols]
         final_tier = "diagnostic_close_edits"
+        final_tier_label = "Tier 4 — Closest edits (diagnostic)"
         final_relaxation = "none"
         final_relaxation_desc = "diagnostic fallback (no valid improvements found)"
 
@@ -645,10 +852,10 @@ def write_lead_report(
         scarcity = bool(cf_summary.get("scarcity", False))
         fallback_used = bool(dataset_analogues)
         md.append(f"- ExMol requested: {sample_budget} | drawn: {sampled}\n")
-        md.append(f"- Final tier: {final_tier_label if len(counterfactuals) > 0 and final_tier != 'none' else 'None'} (relaxation: {final_relax if final_relax else 'none'})\n")
-        md.append(f"- Relaxation used: {relaxation_used}\n")
-        md.append(f"- Generated survivors: {len(counterfactuals)}\n")
-        md.append(f"- Dataset analogue fallback count: {len(dataset_analogues or [])}\n")
+        md.append(f"- Generated tier (Tier 1–4): {final_tier_label if final_tier != 'none' else 'None'}\n")
+        md.append(f"- Relaxation used: {relaxation_used} (applied: {final_relax if final_relax else 'none'})\n")
+        md.append(f"- Generated survivors (Tier 1–4): {len(counterfactuals)}\n")
+        md.append(f"- Dataset analogue fallback count (not included in survivors): {len(dataset_analogues or [])}\n")
         if scarcity:
             md.append("- Scarcity: No candidates survived medicinal constraints.\n")
         if cf_summary.get("final_relaxation_desc"):
@@ -680,6 +887,9 @@ def write_lead_report(
 
     md.append("\n## Counterfactual suggestions (filtered)\n")
     if counterfactuals:
+        tier_src = cf_summary.get("final_tier_label") if cf_summary else counterfactuals[0].get("tier_label", counterfactuals[0].get("tier", ""))
+        relax_src = cf_summary.get("final_relaxation") if cf_summary else counterfactuals[0].get("relaxation", "none")
+        md.append(f"_Rows below are generated from {tier_src or 'unknown tier'} (relaxation: {relax_src or 'none'})._ \n")
         md.append("<table>\n")
         md.append("<tr><th>Rank</th><th>Structure</th><th>Tier</th><th>Relaxation</th><th>Similarity</th><th>p(toxic)</th><th>Δp</th><th>LogP</th><th>QED</th><th>SA</th></tr>\n")
         for i, cf in enumerate(counterfactuals, start=1):
@@ -698,6 +908,7 @@ def write_lead_report(
         if cf_summary:
             md.append(f"- Total candidates sampled: {cf_summary.get('sampled', 'n/a')}\n")
             tiers_seen = [a.get("tier_label", a.get("tier")) for a in cf_summary.get("attempts", [])]
+            md.append(f"- Highest generated tier attempted: {cf_summary.get('final_tier_label', cf_summary.get('final_tier', 'none'))}\n")
             md.append(f"- Tiers evaluated: {', '.join(tiers_seen)}\n")
             md.append("- Interpretation: Local detoxification may not be feasible near this chemistry under current constraints.\n")
         else:
