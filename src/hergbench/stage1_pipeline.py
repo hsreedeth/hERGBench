@@ -459,8 +459,14 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                 if cf_diag is None:
                     cf_diag = {}
 
+                def _is_actionable(cf: Dict[str, Any]) -> bool:
+                    # "diagnostic_close_edits" is Tier 4 (non-actionable by design)
+                    return cf.get("tier") != "diagnostic_close_edits"
+
+                has_actionable = any(_is_actionable(cf) for cf in cfs)
+
                 dataset_fallback: List[Dict[str, Any]] = []
-                if not cfs:
+                if (not cfs) or (not has_actionable):
                     dataset_fallback = dataset_analogues(
                         base_smiles=smi,
                         base_fp=fp,
@@ -469,24 +475,17 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                         dataset_fps=fps_all,
                         dataset_probs=p_all_cal,
                         fp_cfg=fp_cfg,
-                        constraints=constraints,
                         top_k=cf_nmols,
+                        # If you applied the earlier policy-alignment fix:
+                        # constraints=constraints,
                     )
-                    # Keep generated-tier diagnostics intact; add separate fallback diagnostics.
-                    cf_diag = cf_diag or {}
                     cf_diag["dataset_fallback_used"] = True
-                    cf_diag["dataset_fallback_count"] = len(dataset_fallback)
-
-                    # Scarcity should continue to reflect "no generated survivors".
-                    # Do not set final_count to fallback count.
-                    cf_diag["scarcity"] = True
-
+                    cf_diag["final_tier"] = "dataset_fallback" if dataset_fallback else cf_diag.get("final_tier", "none")
+                    cf_diag["final_count"] = len(dataset_fallback)
+                    cf_diag["scarcity"] = False if dataset_fallback else True
                     logger.info("Dataset analogue fallback used for %s: n=%d", mol_id, len(dataset_fallback))
                 else:
-                    dataset_fallback = []
-                    cf_diag = cf_diag or {}
                     cf_diag["dataset_fallback_used"] = False
-                    cf_diag["dataset_fallback_count"] = 0
 
                 if cf_diag:
                     logger.info(
