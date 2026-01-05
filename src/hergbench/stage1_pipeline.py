@@ -460,12 +460,13 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                     cf_diag = {}
 
                 def _is_actionable(cf: Dict[str, Any]) -> bool:
-                    # "diagnostic_close_edits" is Tier 4 (non-actionable by design)
                     return cf.get("tier") != "diagnostic_close_edits"
 
                 has_actionable = any(_is_actionable(cf) for cf in cfs)
 
                 dataset_fallback: List[Dict[str, Any]] = []
+                fallback_used = False
+
                 if (not cfs) or (not has_actionable):
                     dataset_fallback = dataset_analogues(
                         base_smiles=smi,
@@ -476,16 +477,24 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                         dataset_probs=p_all_cal,
                         fp_cfg=fp_cfg,
                         top_k=cf_nmols,
-                        # If you applied the earlier policy-alignment fix:
-                        # constraints=constraints,
+                        constraints=constraints,              # IMPORTANT: align medicinal policy
                     )
-                    cf_diag["dataset_fallback_used"] = True
+                    fallback_used = True
+
+                cf_diag["dataset_fallback_used"] = fallback_used
+                cf_diag["dataset_fallback_count"] = len(dataset_fallback)
+
+                # Only if we truly have *no* generated rows do we re-label the "final tier" as dataset fallback.
+                if fallback_used and (not cfs):
                     cf_diag["final_tier"] = "dataset_fallback" if dataset_fallback else cf_diag.get("final_tier", "none")
+                    cf_diag["final_tier_label"] = (
+                        "Dataset analogue (fallback)" if dataset_fallback else cf_diag.get("final_tier_label", cf_diag.get("final_tier", "none"))
+                    )
+                    cf_diag["final_relaxation"] = "none"
+                    cf_diag["final_relaxation_desc"] = "dataset fallback"
                     cf_diag["final_count"] = len(dataset_fallback)
                     cf_diag["scarcity"] = False if dataset_fallback else True
-                    logger.info("Dataset analogue fallback used for %s: n=%d", mol_id, len(dataset_fallback))
-                else:
-                    cf_diag["dataset_fallback_used"] = False
+
 
                 if cf_diag:
                     logger.info(

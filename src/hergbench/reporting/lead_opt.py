@@ -706,8 +706,59 @@ def write_lead_report(
         return "In-domain"
 
     ood = _ood_flag(max_sim)
+
+    def _display_meta(
+        counterfactuals: List[Dict[str, Any]],
+        dataset_analogues: Optional[List[Dict[str, Any]]],
+        cf_summary: Optional[Dict[str, Any]],
+    ) -> Dict[str, str]:
+        """
+        Single source of truth for what we *display* as the survivor tier/relaxation.
+        Prefer the actual rows we are about to print; only fall back to cf_summary if empty.
+        """
+        if counterfactuals:
+            tiers = {str(cf.get("tier", "")) for cf in counterfactuals}
+            labels = {str(cf.get("tier_label", cf.get("tier", ""))) for cf in counterfactuals}
+            relaxes = {str(cf.get("relaxation", "none")) for cf in counterfactuals}
+
+            tier = next(iter(tiers)) if len(tiers) == 1 else "mixed"
+            tier_label = next(iter(labels)) if len(labels) == 1 else ("Mixed tiers: " + ", ".join(sorted(labels)))
+            relaxation = next(iter(relaxes)) if len(relaxes) == 1 else "mixed"
+
+            return {"tier": tier, "tier_label": tier_label, "relaxation": relaxation, "source": "rows"}
+
+        if dataset_analogues:
+            return {"tier": "dataset_analogue", "tier_label": "Dataset analogue (fallback)", "relaxation": "none", "source": "dataset"}
+
+        if cf_summary:
+            return {
+                "tier": str(cf_summary.get("final_tier", "none")),
+                "tier_label": str(cf_summary.get("final_tier_label", cf_summary.get("final_tier", "none"))),
+                "relaxation": str(cf_summary.get("final_relaxation", "none")),
+                "source": "cf_summary",
+            }
+
+        return {"tier": "none", "tier_label": "None", "relaxation": "none", "source": "none"}
+
+    display = _display_meta(counterfactuals, dataset_analogues, cf_summary)
+
+    # Fail-fast correctness check: if we have rows, cf_summary must agree (allowing dataset-fallback aliasing).
+    if cf_summary and counterfactuals:
+        expected = str(cf_summary.get("final_tier", ""))
+        actual = display["tier"]
+
+        # Allow common aliasing when the orchestration layer calls it "dataset_fallback"
+        # but rows are tagged "dataset_analogue".
+        alias_ok = (expected == "dataset_fallback" and actual == "dataset_analogue")
+
+        if expected and expected not in ("none", "unknown") and (expected != actual) and (not alias_ok):
+            raise ValueError(
+                f"Report tier mismatch: cf_summary.final_tier={expected!r} but displayed rows tier={actual!r}. "
+                "This indicates stale/misaligned cf_summary vs survivors."
+            )
+
     if counterfactuals:
-        result_class = f"Generated suggestions available (Tier: {counterfactuals[0].get('tier_label', counterfactuals[0].get('tier', 'n/a'))})"
+        result_class = f"Generated suggestions available (Tier: {display['tier_label']})"
     elif dataset_analogues:
         result_class = "No generated suggestions; dataset analogues provided"
     else:
@@ -743,15 +794,15 @@ def write_lead_report(
         sampled = cf_summary.get("sampled", "n/a")
         sample_budget = cf_summary.get("sample_budget", sampled)
         attempts = cf_summary.get("attempts", [])
-        final_tier = cf_summary.get("final_tier", "none")
-        final_tier_label = cf_summary.get("final_tier_label", final_tier)
-        final_relax = cf_summary.get("final_relaxation", "none")
+        final_tier = display["tier"]
+        final_tier_label = display["tier_label"]
+        final_relax = display["relaxation"]
         relaxation_used = bool(cf_summary.get("relaxation_used", False))
         scarcity = bool(cf_summary.get("scarcity", False))
         fallback_used = bool(dataset_analogues)
         md.append(f"- ExMol requested: {sample_budget} | drawn: {sampled}\n")
-        md.append(f"- Generated tier (Tier 1–4): {final_tier_label if final_tier != 'none' else 'None'}\n")
-        md.append(f"- Relaxation used: {relaxation_used} (applied: {final_relax if final_relax else 'none'})\n")
+        md.append(f"- Generated tier (Tier 1–4): {display['tier_label'] if display['tier'] != 'none' else 'None'}\n")
+        md.append(f"- Relaxation used: {bool(display['relaxation'] != 'none' and display['relaxation'] != 'mixed')} (applied: {display['relaxation']})\n")
         md.append(f"- Generated survivors (Tier 1–4): {len(counterfactuals)}\n")
         md.append(f"- Dataset analogue fallback count (not included in survivors): {len(dataset_analogues or [])}\n")
         if scarcity:
@@ -759,7 +810,7 @@ def write_lead_report(
         if cf_summary.get("final_relaxation_desc"):
             md.append(f"- Relaxation note: {cf_summary.get('final_relaxation_desc')}\n")
         if attempts:
-            winner_relax = final_relax if final_relax else "none"
+            winner_relax = display["relaxation"] if display["relaxation"] else "none"
             md.append("\n### Filter attrition by tier (baseline + final relaxation)\n")
             md.append("<table>\n")
             md.append("<tr><th>Tier</th><th>Relaxation</th><th>Sampled</th><th>Kept</th><th>Invalid</th><th>Duplicate</th><th>Similarity</th><th>Prob</th><th>Δp</th><th>SA</th><th>ΔLogP</th><th>QED</th><th>Alerts</th></tr>\n")
@@ -785,9 +836,7 @@ def write_lead_report(
 
     md.append("\n## Counterfactual suggestions (filtered)\n")
     if counterfactuals:
-        tier_src = cf_summary.get("final_tier_label") if cf_summary else counterfactuals[0].get("tier_label", counterfactuals[0].get("tier", ""))
-        relax_src = cf_summary.get("final_relaxation") if cf_summary else counterfactuals[0].get("relaxation", "none")
-        md.append(f"_Rows below are generated from {tier_src or 'unknown tier'} (relaxation: {relax_src or 'none'})._ \n")
+        md.append(f"_Rows below are generated from {display['tier_label']} (relaxation: {display['relaxation']})._ \n")
         md.append("<table>\n")
         md.append("<tr><th>Rank</th><th>Structure</th><th>Tier</th><th>Relaxation</th><th>Similarity</th><th>p(toxic)</th><th>Δp</th><th>LogP</th><th>QED</th><th>SA</th></tr>\n")
         for i, cf in enumerate(counterfactuals, start=1):
