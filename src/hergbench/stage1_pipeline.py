@@ -148,8 +148,10 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
     high_risk_p = float(cf_cfg_raw.get("high_risk_p", 0.7))
     safe_p = float(cf_cfg_raw.get("safe_p", 0.3))
     exmol_preset = str(cf_cfg_raw.get("exmol_preset", "medium"))
-    cf_exmol_n_samples = int(cf_cfg_raw.get("exmol_n_samples", cf_cfg_raw.get("search_nmols", 1800)))
-    cf_exmol_n_samples = min(max(cf_exmol_n_samples, 1500), 2000)  # enforce sampling budget bounds
+    # Keep pipeline config simple; budget guardrails live inside generate_counterfactuals_exmol now.
+    cf_exmol_n_samples = int(cf_cfg_raw.get("exmol_n_samples", 1800))
+    cf_search_nmols = cf_cfg_raw.get("search_nmols", None)
+    cf_search_nmols = int(cf_search_nmols) if cf_search_nmols is not None else None
     cf_delta_min = float(cf_cfg_raw.get("delta_min", 0.10))
     cf_delta_min_tier3 = float(cf_cfg_raw.get("delta_min_tier3", 0.05))
     cf_relax_plan = cf_cfg_raw.get("relaxations", [])
@@ -443,6 +445,7 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                         exmol_preset=exmol_preset,
                         nmols=cf_nmols,
                         exmol_n_samples=cf_exmol_n_samples,
+                        search_nmols=cf_search_nmols,
                         delta_min=cf_delta_min,
                         delta_min_tier3=cf_delta_min_tier3,
                         relaxation_plan=cf_relax_plan,
@@ -466,15 +469,24 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                         dataset_fps=fps_all,
                         dataset_probs=p_all_cal,
                         fp_cfg=fp_cfg,
+                        constraints=constraints,
                         top_k=cf_nmols,
                     )
+                    # Keep generated-tier diagnostics intact; add separate fallback diagnostics.
+                    cf_diag = cf_diag or {}
                     cf_diag["dataset_fallback_used"] = True
-                    cf_diag["final_tier"] = cf_diag.get("final_tier", "dataset_fallback")
-                    cf_diag["final_count"] = len(dataset_fallback)
-                    cf_diag["scarcity"] = False if dataset_fallback else True
+                    cf_diag["dataset_fallback_count"] = len(dataset_fallback)
+
+                    # Scarcity should continue to reflect "no generated survivors".
+                    # Do not set final_count to fallback count.
+                    cf_diag["scarcity"] = True
+
                     logger.info("Dataset analogue fallback used for %s: n=%d", mol_id, len(dataset_fallback))
                 else:
+                    dataset_fallback = []
+                    cf_diag = cf_diag or {}
                     cf_diag["dataset_fallback_used"] = False
+                    cf_diag["dataset_fallback_count"] = 0
 
                 if cf_diag:
                     logger.info(
@@ -487,7 +499,7 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                         cf_diag.get("scarcity"),
                         cf_diag.get("dataset_fallback_used"),
                     )
-                    fallback_used = cf_diag.get("final_tier") not in ("flip", "none", None)
+                    fallback_used = bool(cf_diag.get("dataset_fallback_used", False))
                     relaxation_used = cf_diag.get("final_relaxation") not in ("none", None, "")
                     logger.info(
                         "CF audit flags %s: fallback_tier=%s relaxation_used=%s scarcity=%s",

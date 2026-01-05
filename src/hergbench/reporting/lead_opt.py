@@ -266,96 +266,6 @@ def generate_counterfactuals_exmol(
             return [float(model_prob(s)) for s in x]
         return [float(model_prob(str(x)))]
 
-    # def _exmol_sample_space(
-    #     base: str,
-    #     preset: str,
-    #     budget: int,
-    # ) -> Tuple[List[Any], Optional[str]]:
-    #     err_msg: Optional[str] = None
-    #     examples: List[Any] = []
-    #     try:
-    #         sig = inspect.signature(exmol.sample_space)
-    #     except Exception:
-    #         sig = None
-
-    #     method_kwargs: Dict[str, Any] = {"min_mutations": 1, "max_mutations": 1}
-    #     try:
-    #         method_kwargs["alphabet"] = exmol.get_basic_alphabet()
-    #     except Exception:
-    #         pass
-
-    #     call_kwargs: Dict[str, Any] = {}
-
-    #     def _maybe_add(name: str, value: Any) -> None:
-    #         if sig is None or name in sig.parameters:
-    #             call_kwargs[name] = value
-
-    #     if sig is None:
-    #         call_kwargs["origin_smiles"] = base
-    #     else:
-    #         if "origin_smiles" in sig.parameters:
-    #             call_kwargs["origin_smiles"] = base
-    #         elif "smiles" in sig.parameters:
-    #             call_kwargs["smiles"] = base
-    #         elif "base" in sig.parameters:
-    #             call_kwargs["base"] = base
-    #         else:
-    #             first = next(iter(sig.parameters))
-    #             call_kwargs[first] = base
-
-        
-
-
-    #     _maybe_add("f", _exmol_f)
-    #     _maybe_add("batched", True)
-    #     _maybe_add("preset", preset)
-    #     _maybe_add("method_kwargs", method_kwargs)
-    #     _maybe_add("num_samples", budget)
-    #     _maybe_add("quiet", True)
-    #     _maybe_add("use_selfies", False)
-    #     _maybe_add("sanitize_smiles", True)
-
-    #     try:
-    #         space = exmol.sample_space(**call_kwargs)
-    #         if isinstance(space, tuple):
-    #             space = space[0]
-    #         if isinstance(space, list):
-    #             examples = list(space)
-    #         elif getattr(space, "examples", None) is not None:
-    #             examples = list(getattr(space, "examples"))
-    #         elif getattr(space, "mols", None) is not None:
-    #             examples = list(getattr(space, "mols"))
-    #     except Exception as e:
-    #         err_msg = str(e)
-    #         examples = []
-    #     return examples, err_msg
-
-    # # ExMol sampling from sample_space; no cf_explain used for the pool.
-    # examples, sample_err = _exmol_sample_space(
-    #     base=base_smiles, preset=exmol_preset, budget=sample_budget
-    # )
-    # sample_count = len(examples)
-    # if logger:
-    #     logger.info("ExMol requested num_samples=%d, sampled=%d (err=%s)", sample_budget, sample_count, sample_err)
-
-    # if sample_err and sample_count == 0:
-    #     diag = {
-    #         "sampled": 0,
-    #         "sample_budget": sample_budget,
-    #         "sample_error": sample_err,
-    #         "target_prob_max": float(safe_prob_max),
-    #         "attempts": [],
-    #         "final_tier": "error",
-    #         "final_tier_label": "error",
-    #         "final_relaxation": "none",
-    #         "final_relaxation_desc": "sampling failed",
-    #         "relaxation_used": False,
-    #         "final_count": 0,
-    #         "scarcity": True,
-    #         "error": sample_err,
-    #     }
-    #     return [], diag
-
     def _exmol_sample_space(base: str, preset: str, budget: int) -> Tuple[List[Any], Optional[str]]:
         err_msg: Optional[str] = None
         examples: List[Any] = []
@@ -521,18 +431,6 @@ def generate_counterfactuals_exmol(
         }
         kwargs.update({k: v for k, v in updates.items() if k in kwargs})
         return CFConstraints(**kwargs)
-
-    # def _resolve_min_tanimoto(tier: Dict[str, Any], constraint_set: CFConstraints) -> Tuple[float, str]:
-    #     base_min = constraint_set.min_tanimoto
-    #     if tier["min_key"] == "flip":
-    #         source = "min_tanimoto_flip" if constraint_set.min_tanimoto_flip is not None else "tier_default"
-    #         cfg_min = constraint_set.min_tanimoto_flip if constraint_set.min_tanimoto_flip is not None else tier["default_min_tanimoto"]
-    #     else:
-    #         source = "min_tanimoto_improve" if constraint_set.min_tanimoto_improve is not None else "tier_default"
-    #         cfg_min = constraint_set.min_tanimoto_improve if constraint_set.min_tanimoto_improve is not None else tier["default_min_tanimoto"]
-    #     # optional global floor for backward compatibility
-    #     min_sim = max(cfg_min, base_min) if base_min is not None else cfg_min
-    #     return min_sim, source
 
     def _resolve_min_tanimoto(tier, constraint_set):
         if tier["min_key"] == "flip":
