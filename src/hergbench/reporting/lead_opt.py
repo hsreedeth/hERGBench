@@ -15,6 +15,13 @@ from rdkit.Chem.FilterCatalog import FilterCatalog, FilterCatalogParams
 
 from hergbench.features.fingerprints import FingerprintConfig, mol_to_ecfp_bits
 from hergbench.reporting.sascorer import calculate_sa_score
+from hergbench.data.standardize import StandardizeConfig, canonical_smiles, smiles_to_mol, standardize_mol
+
+try:
+    from rdkit.Chem.MolStandardize import rdMolStandardize
+except Exception:  # pragma: no cover
+    rdMolStandardize = None
+
 
 
 @dataclass(frozen=True)
@@ -28,6 +35,50 @@ class CFConstraints:
     qed_min: float = 0.0  # optional; set >0 to enforce
     pains: bool = True
 
+_STD_CFG_SCORING = StandardizeConfig(
+    tautomer_canonicalize=True,
+    strip_salts=True,
+)
+
+_UNCHARGER = None
+
+
+def _std_for_scoring(smiles: str) -> tuple[Optional[str], Optional[Chem.Mol]]:
+    """
+    Project-canonical scoring identity:
+      1) project standardization (salts/tautomers, etc.)
+      2) neutralize/charge-parent to kill ionization-only variants
+      3) canonical smiles
+    """
+    if not smiles:
+        return None, None
+
+    m = smiles_to_mol(smiles)
+    m = standardize_mol(m, _STD_CFG_SCORING)
+    if m is None:
+        return None, None
+
+    # Neutralize/charge-parent: this is the critical "no fake progress from [O-]" step.
+    # We keep it local to reporting so you don't silently change training unless you choose to.
+    if rdMolStandardize is not None:
+        try:
+            # ChargeParent is more aggressive; if not available in your RDKit build, fall back to Uncharger.
+            if hasattr(rdMolStandardize, "ChargeParent"):
+                m = rdMolStandardize.ChargeParent(m)
+            else:
+                global _UNCHARGER
+                if _UNCHARGER is None:
+                    _UNCHARGER = rdMolStandardize.Uncharger()
+                m = _UNCHARGER.uncharge(m)
+        except Exception:
+            pass
+
+    try:
+        Chem.SanitizeMol(m)
+    except Exception:
+        return None, None
+
+    return canonical_smiles(m), m
 
 def _make_filter_catalog() -> FilterCatalog:
     params = FilterCatalogParams()
@@ -104,31 +155,39 @@ def dataset_analogues(
     min_sim: float = 0.3,
     fpscores_cache_dir: Optional[Path] = None,
 ) -> List[Dict[str, Any]]:
+    """Return dataset-derived analogues (lowest predicted risk, similar to base)."""
 
-    """Return dataset-derived analogues (lowest predicted risk, similar to base).
+    base_std_smi, base_std_mol = _std_for_scoring(base_smiles)
+    if base_std_smi is None or base_std_mol is None:
+        return []
 
-    If no molecules meet min_sim, fall back to top_k by similarity regardless of p.
-    """
+    base_fp_std = mol_to_ecfp_bits(base_std_mol, fp_cfg) if fp_cfg is not None else base_fp
+    base_fp_use = base_fp_std if base_fp_std is not None else base_fp
+    base_p_use = base_p
+
+    sa_cutoff = float(constraints.sa_max) if constraints is not None else 4.5
+    use_pains = bool(constraints.pains) if constraints is not None else True
+
     entries: List[Dict[str, Any]] = []
-    for smi, fp, p in zip(dataset_smiles, dataset_fps, dataset_probs):
-        if smi == base_smiles:
+    for raw_smi, fp, p in zip(dataset_smiles, dataset_fps, dataset_probs):
+        std_smi, mol = _std_for_scoring(raw_smi)
+        if std_smi is None or mol is None:
             continue
-        sim = float(DataStructs.TanimotoSimilarity(base_fp, fp))
-        try:
-            mol = Chem.MolFromSmiles(smi)
-            Chem.SanitizeMol(mol)
-        except Exception:
+
+        # Remove trivial identity-equivalents to base under scoring convention
+        if std_smi == base_std_smi:
             continue
+
+        # Avoid mixing identities: only keep cases where standardize/neutralize does not change the dataset row identity.
+        if std_smi != raw_smi:
+            continue
+
+        sim = float(DataStructs.TanimotoSimilarity(base_fp_use, fp))
+
         props = mol_props(mol, cache_dir=fpscores_cache_dir)
-
-        # Use the same medicinal policy as CFConstraints when provided.
-        sa_cutoff = float(constraints.sa_max) if constraints is not None else 4.5
-        use_pains = bool(constraints.pains) if constraints is not None else True
-
-        alert = has_structural_alerts(mol) if use_pains else False
         sa_val = float(props["sascore"])
+        alert = has_structural_alerts(mol) if use_pains else False
 
-        # Keep "failed" only for truly invalid SA; otherwise keep the numeric value for reporting.
         sa_status = "ok" if np.isfinite(sa_val) else "failed"
         if not np.isfinite(sa_val):
             sa_val = float("nan")
@@ -137,12 +196,13 @@ def dataset_analogues(
 
         entries.append(
             {
-                "smiles": smi,
+                "raw_smiles": raw_smi,
+                "smiles": std_smi,
                 "similarity": sim,
                 "p": float(p),
-                "delta_p": base_p - float(p),
-                "logp": props["logp"],
-                "qed": props["qed"],
+                "delta_p": base_p_use - float(p),
+                "logp": float(props["logp"]),
+                "qed": float(props["qed"]),
                 "sascore": sa_val,
                 "sa_status": sa_status,
                 "actionable": actionable,
@@ -156,7 +216,6 @@ def dataset_analogues(
             }
         )
 
-    # Primary filter: enforce similarity >= min_sim
     primary = [e for e in entries if e["similarity"] >= min_sim]
     pool = primary if primary else entries
     pool.sort(key=lambda r: (r["p"], -r["similarity"], r["smiles"]))
@@ -187,10 +246,29 @@ def generate_counterfactuals_exmol(
     """
     import exmol  # type: ignore
 
-    p_base = float(model_prob(base_smiles))
-    mol_base = Chem.MolFromSmiles(base_smiles)
-    if mol_base is None:
-        return [], {"error": "invalid_base_smiles", "sampled": 0, "final_tier": "none", "final_count": 0, "scarcity": True}
+    _prob_cache: Dict[str, float] = {}
+
+    def prob_cached(s: str) -> float:
+        if s in _prob_cache:
+            return _prob_cache[s]
+        v = float(model_prob(s))
+        _prob_cache[s] = v
+        return v
+
+
+    base_std_smi, mol_base = _std_for_scoring(base_smiles)
+    if mol_base is None or base_std_smi is None:
+        return [], {
+            "error": "invalid_base_smiles",
+            "sampled": 0,
+            "final_tier": "none",
+            "final_count": 0,
+            "scarcity": True,
+        }
+
+    # IMPORTANT: score the *standardized identity*
+    p_base = float(prob_cached(base_std_smi))
+
 
     # Enforce a large ExMol budget (bounded) to give rare counterfactuals a chance under strict medicinal filters.
     sample_budget = int(search_nmols if search_nmols is not None else exmol_n_samples)
@@ -261,10 +339,22 @@ def generate_counterfactuals_exmol(
     relaxation_steps.extend(validated_relaxations)
 
     def _exmol_f(x, *args):
-        """Wrapper matching ExMol expectations for batched scoring."""
+        """Wrapper matching ExMol expectations for batched scoring.
+
+        Critical: always score the standardized identity, not the raw SMILES.
+        """
+        def _score_one(smi: Any) -> float:
+            std_smi, _mol = _std_for_scoring(str(smi))
+            if std_smi is None:
+                # Treat unstandardizable molecules as toxic so ExMol doesn't prefer them.
+                return 1.0
+            return float(model_prob(std_smi))
+
         if isinstance(x, list):
-            return [float(model_prob(s)) for s in x]
-        return [float(model_prob(str(x)))]
+            return [_score_one(s) for s in x]
+        return [_score_one(x)]
+
+
 
     def _exmol_sample_space(base: str, preset: str, budget: int) -> Tuple[List[Any], Optional[str]]:
         err_msg: Optional[str] = None
@@ -388,7 +478,7 @@ def generate_counterfactuals_exmol(
 
 
     # ExMol sampling from sample_space; prefer direct examples, but allow cf_explain fallback.
-    examples, sample_err = _exmol_sample_space(base=base_smiles, preset=exmol_preset, budget=sample_budget)
+    examples, sample_err = _exmol_sample_space(base=base_std_smi, preset=exmol_preset, budget=sample_budget)
     sample_count = len(examples)
 
     if logger:
@@ -483,21 +573,21 @@ def generate_counterfactuals_exmol(
             if not smi or smi == base_smiles:
                 counts["invalid"] += 1
                 continue
-            mol = Chem.MolFromSmiles(smi)
-            if mol is None:
-                counts["invalid"] += 1
-                continue
-            try:
-                Chem.SanitizeMol(mol)
-            except Exception:
+            raw_smi = smi
+            std_smi, mol = _std_for_scoring(raw_smi)
+            if std_smi is None or mol is None:
                 counts["invalid"] += 1
                 continue
 
-            smi_canon = Chem.MolToSmiles(mol, canonical=True)
-            if smi_canon in seen:
+            # If it collapses back to the base identity, it's an ionization/protonation artifact (or equivalent).
+            if std_smi == base_std_smi:
                 counts["duplicate"] += 1
                 continue
-            seen.add(smi_canon)
+
+            if std_smi in seen:
+                counts["duplicate"] += 1
+                continue
+            seen.add(std_smi)
 
             fp = mol_to_ecfp_bits(mol, fp_cfg)
             sim = float(DataStructs.TanimotoSimilarity(fp_base, fp))
@@ -505,7 +595,7 @@ def generate_counterfactuals_exmol(
                 counts["similarity_filtered"] += 1
                 continue
 
-            p = float(model_prob(smi))
+            p = float(prob_cached(std_smi))
             delta_p = p_base - p
             if tier["prob_max"] is not None and p >= float(tier["prob_max"]):
                 counts["prob_filtered"] += 1
@@ -534,7 +624,8 @@ def generate_counterfactuals_exmol(
 
             rows.append(
                 {
-                    "smiles": smi,
+                    "raw_smiles": raw_smi,
+                    "smiles": std_smi,
                     "similarity": sim,
                     "p": p,
                     "delta_p": delta_p,
@@ -605,37 +696,50 @@ def generate_counterfactuals_exmol(
         if final_rows:
             break
 
-    # Tier 4 diagnostic fallback: closest edits from sampled space if nothing survived Tier 1–3 with or without relaxations.
-    if not final_rows and examples:
+    # Tier 4 diagnostic fallback: closest edits from sampled space if nothing survived Tier 1–3.
+    if (not final_rows) and examples:
         diag_rows: List[Dict[str, Any]] = []
-        seen_diag = set()
+        seen_std: set[str] = set()
+
         for ex in examples:
-            smi = getattr(ex, "smiles", None)
-            if smi is None and isinstance(ex, dict):
-                smi = ex.get("smiles")
-            if not smi or smi == base_smiles:
+            raw_smi = getattr(ex, "smiles", None)
+            if raw_smi is None and isinstance(ex, dict):
+                raw_smi = ex.get("smiles")
+            if not raw_smi:
                 continue
-            mol = Chem.MolFromSmiles(smi)
-            if mol is None:
+
+            # Standardize/neutralize ONCE to establish scoring identity.
+            std_smi, mol = _std_for_scoring(raw_smi)
+            if std_smi is None or mol is None:
                 continue
-            try:
-                Chem.SanitizeMol(mol)
-            except Exception:
+
+            # Skip if this candidate collapses to the base standardized identity.
+            if std_smi == base_std_smi:
                 continue
-            smi_canon = Chem.MolToSmiles(mol, canonical=True)
-            if smi_canon in seen_diag:
+
+            # CRITICAL: dedupe on standardized identity BEFORE any scoring calls.
+            if std_smi in seen_std:
                 continue
-            seen_diag.add(smi_canon)
+            seen_std.add(std_smi)
+
+            # Similarity computed on standardized identity (mol).
             fp = mol_to_ecfp_bits(mol, fp_cfg)
             sim = float(DataStructs.TanimotoSimilarity(fp_base, fp))
+
+            # CRITICAL: compute p ONCE per kept standardized identity.
+            p_std = float(prob_cached(std_smi))
+            delta_std = p_base - p_std
+
             props = mol_props(mol, cache_dir=fpscores_cache_dir)
             alert = has_structural_alerts(mol) if constraints.pains else False
+
             diag_rows.append(
                 {
-                    "smiles": smi,
+                    "raw_smiles": raw_smi,
+                    "smiles": std_smi,
                     "similarity": sim,
-                    "p": float(model_prob(smi)),
-                    "delta_p": p_base - float(model_prob(smi)),
+                    "p": p_std,
+                    "delta_p": delta_std,
                     "logp": props["logp"],
                     "qed": props["qed"],
                     "sascore": props["sascore"],
@@ -646,12 +750,15 @@ def generate_counterfactuals_exmol(
                     "relaxation_desc": "diagnostic fallback (no valid improvements found)",
                 }
             )
+
         diag_rows.sort(key=lambda r: r["similarity"], reverse=True)
         final_rows = diag_rows[:nmols]
         final_tier = "diagnostic_close_edits"
         final_tier_label = "Tier 4 — Closest edits (diagnostic)"
         final_relaxation = "none"
         final_relaxation_desc = "diagnostic fallback (no valid improvements found)"
+
+
 
     # rank: high risk drop then high similarity to prefer meaningful and close suggestions
     final_rows.sort(key=lambda r: (r["delta_p"], r["similarity"]), reverse=True)
@@ -880,15 +987,31 @@ def write_lead_report(
         md.append("</table>\n")
         if all(not ana.get("actionable") for ana in dataset_analogues):
             md.append("Fallback analogues are context-only; none meet feasibility constraints.\n")
+    def _json_sanitize_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Remove non-JSON-serializable fields from report rows.
+        This is a reporting-layer guardrail: never allow RDKit Mol objects (or other objects)
+        into the audit JSON.
+        """
+        drop_keys = {"_std_mol"}  # extend if needed later
+        out: List[Dict[str, Any]] = []
+        for r in rows:
+            rr = {k: v for k, v in r.items() if k not in drop_keys}
+            # Optional: defensively drop any remaining RDKit Mol-like objects
+            rr = {k: v for k, v in rr.items() if not hasattr(v, "GetNumAtoms")}
+            out.append(rr)
+        return out
 
     md.append("\n## Raw records (for audit)\n")
     md.append("### Counterfactuals JSON\n")
     md.append("```json\n")
-    md.append(json.dumps(counterfactuals or [], indent=2))
+    md.append(json.dumps(_json_sanitize_rows(counterfactuals or []), indent=2))
     md.append("\n```\n")
+
     md.append("### Dataset analogues JSON\n")
     md.append("```json\n")
-    md.append(json.dumps(dataset_analogues or [], indent=2))
+    md.append(json.dumps(_json_sanitize_rows(dataset_analogues or []), indent=2))
     md.append("\n```\n")
+
 
     (out_dir / "report.md").write_text("".join(md), encoding="utf-8")

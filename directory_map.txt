@@ -2,36 +2,37 @@ hERGBench directory map
 
 hERGBench/
 - README.md - project overview
-- Makefile - shortcuts for run and lint
+- technical.md - technical summary and pipeline notes
+- stage1_schematic.md - Stage 1 process/methodology outline
+- Makefile - shortcuts for run/stage1/lint/format
 - pyproject.toml - package metadata and deps
 - configs/
   - base.yaml - stage0 smoke config
+  - stage1_mvp.yaml - Stage 1 baseline + lead optimization config
 - data/
   - raw/ - raw inputs staging
-  - processed/ - processed artifacts
-  - splits/ - prepared data splits
+  - processed/ - cleaned dataset artifacts
+  - splits/ - prepared data split CSVs
 - reports/
-  - runs/ - run outputs and logs
-    - 2025-12-29_212447_seed42_stage0_smoke_test/ - stage0 log only
-    - 2025-12-29_212551_seed42_stage0_smoke_test/ - stage0 artifacts
-    - 2025-12-29_213513_seed42_stage0_smoke_test/ - stage0 artifacts
-  - figures/ - plotting space
-  - lead_reports/ - lead report space
+  - runs/ - timestamped run outputs (tables, figures, predictions, models, lead_reports per run)
+  - figures/ - plotting space (may be run-linked)
+  - lead_reports/ - top-level lead report space
   - tables/ - table outputs
 - src/
-  - hergbench/ - package code
-    - cli.py - Typer entry point for stage0 run
-    - data/tdc_fetch.py - TDC fetch helper
-    - utils/config.py - YAML config loader
-    - utils/logging.py - run logging and metadata writer
-    - utils/repro.py - reproducibility helpers
-    - evaluation/ - evaluation stub
-    - features/ - feature engineering stub
-    - models/ - model code stub
-    - reporting/ - reporting stub
+  - hergbench/
+    - cli.py - Typer entry point for stage0 and stage1
+    - stage1_pipeline.py - Stage 1 training/eval + lead-optimization pipeline
+    - data/ - dataset prep/splits/standardization (herg_dataset.py, standardize.py, splits.py, tdc_fetch.py)
+    - features/ - fingerprints and similarity helpers (fingerprints.py)
+    - models/ - XGBoost tuning/fitting (xgb_optuna.py)
+    - evaluation/ - metrics, calibration, plotting (eval.py)
+    - reporting/ - lead optimization + SA scoring (lead_opt.py, sascorer.py, cf_smoke_test.py)
+    - utils/ - config/logging/repro helpers (config.py, logging.py, repro.py)
   - hergbench.egg-info/ - build metadata
+  - hergbench_tdc.egg-info/ - auxiliary egg-info
 - hergbench.egg-info/ - install metadata
+- tests/ - pytest suite (test_lead_opt.py, test_reporting_layer.py, sascorer_test.py)
 - notes.txt - scratch notes
 - gitcomms.txt - commit message drafts
 - explanation_tutorial_notes.txt - tutorial notes
-- .gitignore - git ignore rules
+- directory_map.txt - this file

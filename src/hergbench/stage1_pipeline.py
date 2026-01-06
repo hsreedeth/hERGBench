@@ -13,6 +13,7 @@ from rdkit import DataStructs
 from sklearn.metrics import average_precision_score
 
 from hergbench.data.herg_dataset import load_or_prepare_dataset
+from hergbench.data.standardize import StandardizeConfig, canonical_smiles, smiles_to_mol, standardize_mol
 from hergbench.data.splits import SplitConfig, get_or_create_split, split_df
 from hergbench.evaluation.eval import (
     CalibrationConfig,
@@ -25,7 +26,14 @@ from hergbench.evaluation.eval import (
 )
 from hergbench.features.fingerprints import FingerprintConfig, bulk_max_tanimoto, fps_to_numpy, mol_to_ecfp_bits
 from hergbench.models.xgb_optuna import XGBConfig, fit_xgb, tune_xgb
-from hergbench.reporting.lead_opt import CFConstraints, dataset_analogues, generate_counterfactuals_exmol, write_lead_report
+from hergbench.reporting.lead_opt import (
+    CFConstraints,
+    dataset_analogues,
+    generate_counterfactuals_exmol,
+    has_structural_alerts,
+    mol_props,
+    write_lead_report,
+)
 
 
 @dataclass(frozen=True)
@@ -458,6 +466,56 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
 
                 if cf_diag is None:
                     cf_diag = {}
+
+                # Normalize counterfactual identities to the Stage-1 canonical form for scoring/deduplication.
+                std_cfg = StandardizeConfig(tautomer_canonicalize=True, strip_salts=True)
+
+                def _std_for_scoring(smiles: str, cfg: StandardizeConfig):
+                    mol_sc = smiles_to_mol(smiles)
+                    mol_sc = standardize_mol(mol_sc, cfg)
+                    if mol_sc is None:
+                        return None, None
+                    return canonical_smiles(mol_sc), mol_sc
+
+                base_std_smi, base_std_mol = _std_for_scoring(smi, std_cfg)
+                if base_std_smi is None:
+                    base_std_smi = smi
+                base_std_p = float(prob_fn(base_std_smi))
+
+                seen_std = set()
+                normalized: List[Dict[str, Any]] = []
+                for cf in cfs:
+                    raw = cf.get("smiles")
+                    std_smi, std_mol = _std_for_scoring(raw, std_cfg)
+                    if std_smi is None or std_mol is None:
+                        continue
+                    if std_smi == base_std_smi:
+                        continue
+                    if std_smi in seen_std:
+                        continue
+                    seen_std.add(std_smi)
+
+                    std_fp = mol_to_ecfp_bits(std_mol, fp_cfg)
+                    sim_to_train = float(max(DataStructs.BulkTanimotoSimilarity(std_fp, train_fps0))) if train_fps0 else 0.0
+                    p_std = float(prob_fn(std_smi))
+                    delta_std = base_std_p - p_std
+                    props_std = mol_props(std_mol)
+                    alert_std = has_structural_alerts(std_mol) if constraints.pains else False
+
+                    cf["raw_smiles"] = raw
+                    cf["smiles"] = std_smi
+                    cf["_std_mol"] = std_mol
+                    cf["similarity"] = sim_to_train
+                    cf["p"] = p_std
+                    cf["delta_p"] = delta_std
+                    cf["logp"] = props_std["logp"]
+                    cf["qed"] = props_std["qed"]
+                    cf["sascore"] = props_std["sascore"]
+                    cf["alert"] = alert_std
+
+                    normalized.append(cf)
+
+                cfs = normalized
 
                 def _is_actionable(cf: Dict[str, Any]) -> bool:
                     return cf.get("tier") != "diagnostic_close_edits"
