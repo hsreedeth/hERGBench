@@ -1,0 +1,73 @@
+# Stage 1 MVP (baseline-only) with triple split types and medicinal-chemist counterfactual filter
+# Adjust paths (important)
+project:
+  project_name: "hergbench"
+  run_name: "stage1_mvp"
+
+repro:
+  seed: 42
+
+paths:
+  data_raw: "data/raw"
+  data_processed: "data/processed"
+  data_splits: "data/splits"
+  reports_root: "reports"
+  runs_root: "reports/runs"
+
+logging:
+  level: "INFO"
+
+stage1:
+  dataset:
+    tdc_task: "Tox"
+    name: "hERG"
+    smiles_col: "Drug"
+    label_col: "Y"
+
+  splits:
+    types: ["cluster"]   # per protocol, temporarily set to clust only. change back after cftest.
+    frac_train: 0.80
+    frac_val: 0.10
+    frac_test: 0.10
+    seeds: [11]
+    butina_cutoff: 0.60        # Tanimoto similarity cutoff for Butina
+    force_resplit: false
+
+  features:
+    radius: 2
+    n_bits: 2048
+
+  model:
+    objective: "aucpr"
+    optuna_trials: 75
+    early_stopping_rounds: 50
+    max_estimators: 4000
+
+  calibration:
+    method: "isotonic"         # "sigmoid" for Platt
+    threshold_metric: "youden" # or "f1"
+    n_bins: 10
+
+  eval:
+    bootstrap_B: 2000
+    bins: [0.3, 0.5, 0.7]
+
+  counterfactuals:
+    enable: true
+    selection: "high_risk"     # per protocol: perturb high-risk predictions
+    high_risk_p: 0.7
+    safe_p: 0.3                # Tier-1 flip only; Tier-2/3 governed by delta_min thresholds
+    exmol_preset: "medium"
+    exmol_n_samples: 1800      # bounded to 1500–2000 to surface rare valid counterfactuals
+    nmols: 5
+    delta_min: 0.10            # risk-reduction floor (Tier 2)
+    delta_min_tier3: 0.05      # risk-reduction floor (Tier 3)
+    max_targets: 20
+    relaxations: []            # optional single-constraint relaxations, each audited in reports
+    constraints:
+      min_tanimoto_flip: 0.5
+      min_tanimoto_improve: 0.7
+      sa_max: 4.5
+      logp_delta_max: 1.5
+      qed_min: 0.0
+      pains: true
