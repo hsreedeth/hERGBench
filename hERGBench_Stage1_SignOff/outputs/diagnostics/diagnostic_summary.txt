@@ -1,0 +1,6 @@
+Panel size: 30
+Unique mol_id: True
+Reports found: 0/30
+Tier violations: 0
+cf_summary mismatches: 0
+fallback inconsistencies: 0
