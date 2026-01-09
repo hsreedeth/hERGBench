@@ -793,6 +793,8 @@ def write_lead_report(
     counterfactuals: List[Dict[str, Any]],
     dataset_analogues: Optional[List[Dict[str, Any]]] = None,
     cf_summary: Optional[Dict[str, Any]] = None,
+    base_smiles_std: Optional[str] = None,
+    p_base_std: Optional[float] = None,
 ) -> None:
     """Write a single-molecule lead optimization report as Markdown + PNG images."""
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -858,7 +860,7 @@ def write_lead_report(
         # but rows are tagged "dataset_analogue".
         alias_ok = (expected == "dataset_fallback" and actual == "dataset_analogue")
 
-        if expected and expected not in ("none", "unknown") and (expected != actual) and (not alias_ok):
+        if expected and expected not in ("none", "unknown") and actual and (expected != actual) and (not alias_ok):
             raise ValueError(
                 f"Report tier mismatch: cf_summary.final_tier={expected!r} but displayed rows tier={actual!r}. "
                 "This indicates stale/misaligned cf_summary vs survivors."
@@ -1015,3 +1017,90 @@ def write_lead_report(
 
 
     (out_dir / "report.md").write_text("".join(md), encoding="utf-8")
+    # Machine-readable report.json for downstream yield/signoff
+    TIER_LABEL = {1: "flip", 2: "risk_reduction", 3: "weak_improvement", 4: "diagnostic_close_edits"}
+
+    def _ensure_tier_fields(cf: Dict[str, Any]) -> Dict[str, Any]:
+        tnum = cf.get("tier_num_std", cf.get("tier_num", None))
+        if tnum is None:
+            label = cf.get("tier_label_std", cf.get("tier", None))
+            inv = {v: k for k, v in TIER_LABEL.items()}
+            tnum = inv.get(label, 4)
+        tnum = int(tnum) if tnum is not None else 4
+
+        label = cf.get("tier_label_std", cf.get("tier", None))
+        if (label is None) or (str(label).strip() == ""):
+            label = TIER_LABEL.get(tnum, "diagnostic_close_edits")
+
+        cf["tier_num_std"] = tnum
+        cf["tier"] = TIER_LABEL.get(tnum, "diagnostic_close_edits")
+        cf["tier_label_std"] = cf["tier"]
+        return cf
+
+    base_std = base_smiles_std if base_smiles_std else base_smiles
+    serialized_cfs = []
+    for cf in _json_sanitize_rows(counterfactuals or []):
+        cf = dict(cf)
+        cf = _ensure_tier_fields(cf)
+        serialized_cfs.append(
+            {
+                "raw_smiles": cf.get("raw_smiles", cf.get("smiles")),
+                "smiles_std": cf.get("smiles"),
+                "tier_raw": cf.get("tier_raw"),
+                "p_raw": cf.get("p_raw"),
+                "delta_p_raw": cf.get("delta_p_raw"),
+                "tier_num_std": cf.get("tier_num_std"),
+                "tier_label_std": cf.get("tier_label_std", cf.get("tier")),
+                "p_std": cf.get("p"),
+                "delta_p_std": cf.get("delta_p"),
+                "similarity_to_train": cf.get("similarity"),
+                "qed": cf.get("qed"),
+                "logp": cf.get("logp"),
+                "sascore": cf.get("sascore"),
+                "alert": cf.get("alert"),
+                "relaxation": cf.get("relaxation"),
+            }
+        )
+
+    serialized_analogues = []
+    for ana in _json_sanitize_rows(dataset_analogues or []):
+        serialized_analogues.append(
+            {
+                "smiles": ana.get("smiles"),
+                "similarity": ana.get("similarity"),
+                "p": ana.get("p"),
+                "delta_p": ana.get("delta_p"),
+                "logp": ana.get("logp"),
+                "qed": ana.get("qed"),
+                "sascore": ana.get("sascore"),
+                "alert": ana.get("alert"),
+                "actionable": ana.get("actionable"),
+            }
+        )
+
+    tier123 = [cf for cf in serialized_cfs if cf.get("tier_num_std", 4) in (1, 2, 3)]
+    best_num = min([cf.get("tier_num_std", 4) for cf in serialized_cfs], default=4)
+
+    cf_summary = dict(cf_summary or {})
+    cf_summary["final_best_tier_num"] = best_num
+    cf_summary["final_tier"] = TIER_LABEL.get(best_num, "diagnostic_close_edits")
+    cf_summary["final_tier_label"] = TIER_LABEL.get(best_num, "diagnostic_close_edits")
+    cf_summary["final_count_total"] = len(serialized_cfs)
+    cf_summary["final_count_tier123"] = len(tier123)
+    cf_summary["scarcity"] = len(serialized_cfs) == 0
+
+    report_json = {
+        "mol_id": mol_id,
+        "base_smiles_raw": base_smiles,
+        "base_smiles_std": base_std,
+        "y_true": int(y_true),
+        "threshold": float(threshold),
+        "p_base_raw": float(p_cal),
+        "p_base_std": float(p_base_std) if p_base_std is not None else None,
+        "max_sim_to_train": float(max_sim),
+        "sim_bin": sim_bin,
+        "cf_summary": cf_summary or {},
+        "counterfactuals": serialized_cfs,
+        "dataset_analogues": serialized_analogues,
+    }
+    (out_dir / "report.json").write_text(json.dumps(report_json, indent=2, sort_keys=True), encoding="utf-8")

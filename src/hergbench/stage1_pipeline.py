@@ -73,6 +73,62 @@ def _scale_pos_weight(y: np.ndarray) -> float:
     return (neg / pos) if pos > 0 else 1.0
 
 
+def reconcile_tier_std(
+    p_cf: float,
+    base_p: float,
+    threshold: float,
+    delta_min: float,
+    delta_min_tier3: float,
+    sim_to_train: float,
+    constraints: CFConstraints,
+    alert: bool,
+    sascore: Optional[float],
+    logp_delta: Optional[float] = None,
+    qed: Optional[float] = None,
+) -> Tuple[int, str]:
+    """
+    Recompute tier using standardized scoring + constraints.
+    Tier 1: p_std < threshold AND sim >= min_tanimoto_flip (or min_tanimoto)
+    Tier 2: Δp >= delta_min AND sim >= min_tanimoto_improve (or min_tanimoto)
+    Tier 3: Δp >= delta_min_tier3 AND sim >= min_tanimoto_improve (or min_tanimoto)
+    Tier 4: otherwise, or if hard constraints fail (similarity/PAINS/SA/logP/QED)
+    """
+
+    def _min_sim_required_for_tier(tier_num: int, cons: CFConstraints) -> float:
+        base = float(cons.min_tanimoto) if cons.min_tanimoto is not None else 0.0
+        if tier_num == 1:
+            return float(cons.min_tanimoto_flip) if cons.min_tanimoto_flip is not None else base
+        if tier_num in (2, 3):
+            return float(cons.min_tanimoto_improve) if cons.min_tanimoto_improve is not None else base
+        return base
+
+    # Score-based proposal
+    if p_cf < (threshold - 1e-6):
+        tier = 1
+    elif (base_p - p_cf) >= delta_min:
+        tier = 2
+    elif (base_p - p_cf) >= delta_min_tier3:
+        tier = 3
+    else:
+        tier = 4
+
+    # Medicinal constraints / similarity floors
+    min_sim_req = _min_sim_required_for_tier(tier, constraints)
+    if sim_to_train < min_sim_req:
+        return 4, "diagnostic_close_edits"
+    if constraints.pains and alert:
+        return 4, "diagnostic_close_edits"
+    if sascore is not None and float(sascore) > float(constraints.sa_max):
+        return 4, "diagnostic_close_edits"
+    if logp_delta is not None and float(logp_delta) > float(constraints.logp_delta_max):
+        return 4, "diagnostic_close_edits"
+    if qed is not None and float(qed) < float(constraints.qed_min):
+        return 4, "diagnostic_close_edits"
+
+    label = {1: "flip", 2: "risk_reduction", 3: "weak_improvement", 4: "diagnostic_close_edits"}[tier]
+    return tier, label
+
+
 def _apply_split(
     df: pd.DataFrame,
     idx_map: Dict[str, int],
@@ -500,22 +556,10 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                 if base_std_smi is None:
                     base_std_smi = smi
                 base_std_p = float(prob_fn(base_std_smi))
+                base_props = mol_props(base_std_mol) if base_std_mol is not None else None
 
                 seen_std = set()
                 normalized: List[Dict[str, Any]] = []
-
-                def tier_from_std(p_cf: float, base_p: float, threshold: float, delta_min: float, delta_min_tier3: float) -> int:
-                    # Tier 1: class flip (prob below threshold)
-                    if p_cf < (threshold - 1e-6):
-                        return 1
-                    # Tier 2: meaningful reduction
-                    if (base_p - p_cf) >= delta_min:
-                        return 2
-                    # Tier 3: weaker reduction
-                    if (base_p - p_cf) >= delta_min_tier3:
-                        return 3
-                    return 4
-
                 tier_label_map = {1: "flip", 2: "risk_reduction", 3: "weak_improvement", 4: "diagnostic_close_edits"}
 
                 for cf in cfs:
@@ -535,13 +579,27 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                     delta_std = base_std_p - p_std
                     props_std = mol_props(std_mol)
                     alert_std = has_structural_alerts(std_mol) if constraints.pains else False
+                    logp_delta = None
+                    if base_props is not None and "logp" in props_std and "logp" in base_props:
+                        logp_delta = abs(float(props_std["logp"]) - float(base_props["logp"]))
 
                     tier_raw = cf.get("tier")
                     p_raw = cf.get("p")
                     delta_raw = cf.get("delta_p")
 
-                    tier_num = tier_from_std(p_std, base_std_p, threshold, cf_delta_min, cf_delta_min_tier3)
-                    tier_label_std = tier_label_map[tier_num]
+                    tier_num, tier_label_std = reconcile_tier_std(
+                        p_cf=p_std,
+                        base_p=base_std_p,
+                        threshold=threshold,
+                        delta_min=cf_delta_min,
+                        delta_min_tier3=cf_delta_min_tier3,
+                        sim_to_train=sim_to_train,
+                        constraints=constraints,
+                        alert=alert_std,
+                        sascore=props_std["sascore"],
+                        logp_delta=logp_delta,
+                        qed=props_std["qed"],
+                    )
 
                     cf["raw_smiles"] = raw
                     cf["smiles"] = std_smi
@@ -566,7 +624,7 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                 cfs = normalized
 
                 def _is_actionable(cf: Dict[str, Any]) -> bool:
-                    return cf.get("tier") != "diagnostic_close_edits"
+                    return cf.get("tier_num_std", 4) in (1, 2, 3)
 
                 has_actionable = any(_is_actionable(cf) for cf in cfs)
 
@@ -602,12 +660,16 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                     cf_diag["scarcity"] = False if dataset_fallback else True
 
                 # Reconcile final tier/label/count with standardized survivors if any
-                if cfs:
-                    best_tier_num = min([cf.get("tier_num_std", 4) for cf in cfs]) if cfs else 4
-                    cf_diag["final_tier"] = tier_label_map.get(best_tier_num, cf_diag.get("final_tier"))
-                    cf_diag["final_tier_label"] = cf_diag.get("final_tier_label", tier_label_map.get(best_tier_num))
-                    cf_diag["final_count"] = len(cfs)
-                    cf_diag["scarcity"] = len(cfs) == 0
+                final_count_total = len(cfs)
+                final_tier123 = [cf for cf in cfs if cf.get("tier_num_std", 4) in (1, 2, 3)]
+                final_count_tier123 = len(final_tier123)
+                best_tier_num = min([cf.get("tier_num_std", 4) for cf in cfs]) if cfs else 4
+                cf_diag["final_count_total"] = final_count_total
+                cf_diag["final_count_tier123"] = final_count_tier123
+                cf_diag["final_best_tier_num"] = best_tier_num
+                cf_diag["final_tier"] = tier_label_map.get(best_tier_num, cf_diag.get("final_tier"))
+                cf_diag["final_tier_label"] = tier_label_map.get(best_tier_num, cf_diag.get("final_tier_label"))
+                cf_diag["scarcity"] = final_count_total == 0
 
 
                 if cf_diag:
@@ -642,8 +704,10 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                     out_dir=report_dir,
                     mol_id=mol_id,
                     base_smiles=smi,
+                    base_smiles_std=base_std_smi,
                     y_true=y,
                     p_cal=p_cal,
+                    p_base_std=base_std_p,
                     threshold=threshold,
                     max_sim=max_sim,
                     sim_bin=sim_bin,

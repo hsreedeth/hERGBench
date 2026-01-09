@@ -1,1 +1,6 @@
 smiles,label,max_sim_to_train,ad_bin,report_found,best_tier_num,best_tier_label,tier123_success,n_survivors_total,n_survivors_tier123,median_cf_similarity,median_delta_p,min_p
+COc1ccc2c(c1)c(CC(=O)[O-])c(C)n2C(=O)c1ccc(Cl)cc1,0,0.2558139534883721,<0.3,True,4.0,diagnostic_close_edits,False,1,0,,,
+O=C1CC2(CCCC2)CC(=O)N1CCCCN1CCN(c2ncccn2)CC1,1,0.2702702702702703,<0.3,True,4.0,diagnostic_close_edits,False,5,0,,,
+CC(C)c1nc(CN(C)C(=O)NC(C(=O)N[C@@H](Cc2ccccc2)C[C@H](O)[C@H](Cc2ccccc2)NC(=O)OCc2cncs2)C(C)C)cs1,1,0.3119266055045872,0.3-0.5,True,4.0,diagnostic_close_edits,False,5,0,,,
+CN(C)Cc1cc2cc(Cl)ccc2n1-c1ccc(F)cc1,1,0.3962264150943396,0.3-0.5,True,4.0,diagnostic_close_edits,False,1,0,,,
+CCCCC(=O)N(Cc1ccc(-c2ccccc2-c2nn[n-]n2)cc1)C(C(=O)[O-])C(C)C,0,0.4125,0.3-0.5,True,4.0,diagnostic_close_edits,False,5,0,,,

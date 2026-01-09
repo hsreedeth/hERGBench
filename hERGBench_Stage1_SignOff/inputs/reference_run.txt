@@ -1,0 +1,5 @@
+reference_run_dir: reports/runs/2026-01-09_195103_seed42_stage1_signoff
+git_commit: a8dbffa
+config: configs/stage1_signoff.yaml
+panel_source: hERGBench_Stage1_SignOff/inputs/panel/panel.csv
+

@@ -1,0 +1,6 @@
+smiles,max_sim_to_train,ad_bin,final_tier,relaxation,sampled,kept,invalid,duplicate,similarity_filtered,prob_filtered,delta_filtered,sa_filtered,logp_filtered,qed_filtered,alert_filtered
+COc1ccc2c(c1)c(CC(=O)[O-])c(C)n2C(=O)c1ccc(Cl)cc1,0.2558139534883721,<0.3,Tier 1 — Flip,none,1477,1,0,11,1164,297,0,0,4,0,0
+O=C1CC2(CCCC2)CC(=O)N1CCCCN1CCN(c2ncccn2)CC1,0.2702702702702703,<0.3,Tier 1 — Flip,none,1355,13,0,5,975,56,0,5,10,0,291
+CC(C)c1nc(CN(C)C(=O)NC(C(=O)N[C@@H](Cc2ccccc2)C[C@H](O)[C@H](Cc2ccccc2)NC(=O)OCc2cncs2)C(C)C)cs1,0.3119266055045872,0.3-0.5,Tier 1 — Flip,relax_sa_5.5,1581,6,0,3,547,1008,0,6,2,0,9
+CN(C)Cc1cc2cc(Cl)ccc2n1-c1ccc(F)cc1,0.3962264150943396,0.3-0.5,Tier 1 — Flip,relax_flip_0.4,1370,1,0,3,1053,311,0,0,0,0,2
+CCCCC(=O)N(Cc1ccc(-c2ccccc2-c2nn[n-]n2)cc1)C(C(=O)[O-])C(C)C,0.4125,0.3-0.5,Tier 1 — Flip,none,1468,5,0,7,860,592,0,3,1,0,0

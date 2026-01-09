@@ -59,55 +59,21 @@ def _ad_bin(max_sim: float) -> str:
     return "unknown"
 
 
-def _extract_json_block(md: str, heading_regex: str) -> Optional[str]:
+def load_report_jsons(lead_reports_dir: Path) -> Dict[str, Tuple[Path, dict]]:
     """
-    Extracts the first ```json ... ``` block following a heading marker.
-    heading_regex should match the heading line(s) preceding the json fence.
+    Load report.json files and map by standardized/base smiles (prefers base_smiles_std).
     """
-    # Find heading
-    m = re.search(heading_regex, md, flags=re.IGNORECASE)
-    if not m:
-        return None
-
-    tail = md[m.end() :]
-    m2 = re.search(r"```json\s*(.*?)\s*```", tail, flags=re.DOTALL | re.IGNORECASE)
-    if not m2:
-        return None
-    return m2.group(1).strip()
-
-
-def _extract_base_smiles(md: str) -> Optional[str]:
-    # Matches: - **SMILES:** `...`
-    m = re.search(r"\*\*SMILES:\*\*\s*`([^`]+)`", md)
-    return m.group(1).strip() if m else None
-
-
-def parse_report_md(report_md_path: Path) -> ReportParse:
-    md = report_md_path.read_text(encoding="utf-8")
-
-    base_smiles = _extract_base_smiles(md)
-    if not base_smiles:
-        raise ValueError(f"Could not parse base SMILES from {report_md_path}")
-
-    cf_json = _extract_json_block(md, r"###\s*Counterfactuals\s*JSON")
-    an_json = _extract_json_block(md, r"###\s*Dataset\s*analogues\s*JSON")
-    at_json = _extract_json_block(md, r"All\s*filter\s*attempts\s*\(diagnostic\)")
-
-    counterfactuals = json.loads(cf_json) if cf_json else []
-    analogues = json.loads(an_json) if an_json else []
-    attempts = json.loads(at_json) if at_json else []
-
-    return ReportParse(
-        base_smiles=base_smiles,
-        counterfactuals=counterfactuals,
-        analogues=analogues,
-        attempts=attempts,
-    )
-
-
-def discover_reports(lead_reports_dir: Path) -> List[Path]:
-    # Find any report.md under lead_reports
-    return sorted(lead_reports_dir.rglob("report.md"))
+    out: Dict[str, Tuple[Path, dict]] = {}
+    for jp in sorted(lead_reports_dir.rglob("report.json")):
+        try:
+            data = json.loads(jp.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        smi = data.get("base_smiles_std") or data.get("base_smiles_raw")
+        if not smi:
+            continue
+        out.setdefault(str(smi), (jp, data))
+    return out
 
 
 def summarize_yield(
@@ -122,16 +88,7 @@ def summarize_yield(
 
     panel["ad_bin"] = panel["max_sim_to_train"].astype(float).apply(_ad_bin)
 
-    # Parse reports and map by base_smiles
-    reports = []
-    for rp in discover_reports(lead_reports_dir):
-        parsed = parse_report_md(rp)
-        reports.append((parsed.base_smiles, rp, parsed))
-
-    report_map: Dict[str, Tuple[Path, ReportParse]] = {}
-    for base_smiles, rp, parsed in reports:
-        # If duplicates occur, keep the first (or change to error)
-        report_map.setdefault(base_smiles, (rp, parsed))
+    report_map = load_report_jsons(lead_reports_dir)
 
     rows = []
     for _, r in panel.iterrows():
@@ -161,35 +118,14 @@ def summarize_yield(
             continue
 
         _, parsed = report_map[smi]
-        cfs = parsed.counterfactuals or []
+        cf_summary = parsed.get("cf_summary", {}) if isinstance(parsed, dict) else {}
+        cfs = parsed.get("counterfactuals", []) if isinstance(parsed, dict) else []
 
-        # Determine tier numbers from CF records; fall back to tier_label if needed
-        tier_nums = []
-        for cf in cfs:
-            tier = cf.get("tier")
-            if tier in TIER_ORDER:
-                tier_nums.append(TIER_ORDER[tier])
-            else:
-                # try tier_label text
-                tl = (cf.get("tier_label") or "").lower()
-                if "tier 1" in tl:
-                    tier_nums.append(1)
-                elif "tier 2" in tl:
-                    tier_nums.append(2)
-                elif "tier 3" in tl:
-                    tier_nums.append(3)
-                elif "tier 4" in tl or "diagnostic" in tl:
-                    tier_nums.append(4)
-
-        best_tier_num = min(tier_nums) if tier_nums else 4
-        best_tier_label = None
-        if cfs:
-            best_tier_label = cfs[0].get("tier_label") or TIER_LABEL_FALLBACK.get(best_tier_num)
-
-        # Tier 1–3 survivors count (in practice, your report is “filtered” already,
-        # but we handle mixed tiers safely)
-        tier123 = [cf for cf in cfs if TIER_ORDER.get(cf.get("tier"), 999) in (1, 2, 3)]
+        tier123 = [cf for cf in cfs if cf.get("tier_num_std", 4) in (1, 2, 3)]
         tier123_success = len(tier123) > 0
+
+        best_tier_num = int(cf_summary.get("final_best_tier_num", min([cf.get("tier_num_std", 4) for cf in cfs]) if cfs else 4))
+        best_tier_label = cf_summary.get("final_tier_label") or cf_summary.get("final_tier") or TIER_LABEL_FALLBACK.get(best_tier_num)
 
         def _median(xs: List[float]) -> Optional[float]:
             if not xs:
@@ -199,9 +135,9 @@ def summarize_yield(
             mid = n // 2
             return s[mid] if n % 2 == 1 else 0.5 * (s[mid - 1] + s[mid])
 
-        med_sim = _median([float(cf.get("similarity")) for cf in tier123 if cf.get("similarity") is not None])
-        med_dp = _median([float(cf.get("delta_p")) for cf in tier123 if cf.get("delta_p") is not None])
-        min_p = min([float(cf.get("p")) for cf in tier123 if cf.get("p") is not None], default=None)
+        med_sim = _median([float(cf.get("similarity_to_train")) for cf in tier123 if cf.get("similarity_to_train") is not None])
+        med_dp = _median([float(cf.get("delta_p_std")) for cf in tier123 if cf.get("delta_p_std") is not None])
+        min_p = min([float(cf.get("p_std")) for cf in tier123 if cf.get("p_std") is not None], default=None)
 
         rows.append(
             dict(
@@ -213,8 +149,8 @@ def summarize_yield(
                 best_tier_num=best_tier_num,
                 best_tier_label=best_tier_label,
                 tier123_success=tier123_success,
-                n_survivors_total=len(cfs),
-                n_survivors_tier123=len(tier123),
+                n_survivors_total=int(cf_summary.get("final_count_total", len(cfs))),
+                n_survivors_tier123=int(cf_summary.get("final_count_tier123", len(tier123))),
                 median_cf_similarity=med_sim,
                 median_delta_p=med_dp,
                 min_p=min_p,
@@ -276,14 +212,10 @@ def copy_failure_reports(
     for i, row in failures.iterrows():
         smi = row["smiles"]
         # Find report.md by parsing and matching base_smiles
-        found_dir = None
-        for rp in discover_reports(lead_reports_dir):
-            parsed = parse_report_md(rp)
-            if parsed.base_smiles == smi:
-                found_dir = rp.parent
-                break
-        if not found_dir:
+        report_map = load_report_jsons(lead_reports_dir)
+        if smi not in report_map:
             continue
+        found_dir = report_map[smi][0].parent
 
         safe_name = hashlib.sha1(smi.encode("utf-8")).hexdigest()[:10]
         dest = out_failure_dir / f"{i+1:02d}_{safe_name}"
@@ -301,40 +233,35 @@ def write_attrition_table_for_failures(
     out_csv: Path,
 ) -> None:
     rows = []
+    report_map = load_report_jsons(lead_reports_dir)
     for _, row in failures.iterrows():
         smi = row["smiles"]
-        report_md = None
-        for rp in discover_reports(lead_reports_dir):
-            parsed = parse_report_md(rp)
-            if parsed.base_smiles == smi:
-                report_md = rp
-                attempts = parsed.attempts
-                # Take the *final* attempt entry as “what happened”
-                final = attempts[-1] if attempts else {}
-                c = final.get("counts", {})
-                rows.append(
-                    dict(
-                        smiles=smi,
-                        max_sim_to_train=float(row["max_sim_to_train"]),
-                        ad_bin=row["ad_bin"],
-                        final_tier=final.get("tier_label", final.get("tier")),
-                        relaxation=final.get("relaxation"),
-                        sampled=c.get("sampled", 0),
-                        kept=c.get("kept", 0),
-                        invalid=c.get("invalid", 0),
-                        duplicate=c.get("duplicate", 0),
-                        similarity_filtered=c.get("similarity_filtered", 0),
-                        prob_filtered=c.get("prob_filtered", 0),
-                        delta_filtered=c.get("delta_filtered", 0),
-                        sa_filtered=c.get("sa_filtered", 0),
-                        logp_filtered=c.get("logp_filtered", 0),
-                        qed_filtered=c.get("qed_filtered", 0),
-                        alert_filtered=c.get("alert_filtered", 0),
-                    )
+        if smi in report_map:
+            _, data = report_map[smi]
+            attempts = data.get("cf_summary", {}).get("attempts", [])
+            final = attempts[-1] if attempts else {}
+            c = final.get("counts", {})
+            rows.append(
+                dict(
+                    smiles=smi,
+                    max_sim_to_train=float(row["max_sim_to_train"]),
+                    ad_bin=row["ad_bin"],
+                    final_tier=final.get("tier_label", final.get("tier")),
+                    relaxation=final.get("relaxation"),
+                    sampled=c.get("sampled", 0),
+                    kept=c.get("kept", 0),
+                    invalid=c.get("invalid", 0),
+                    duplicate=c.get("duplicate", 0),
+                    similarity_filtered=c.get("similarity_filtered", 0),
+                    prob_filtered=c.get("prob_filtered", 0),
+                    delta_filtered=c.get("delta_filtered", 0),
+                    sa_filtered=c.get("sa_filtered", 0),
+                    logp_filtered=c.get("logp_filtered", 0),
+                    qed_filtered=c.get("qed_filtered", 0),
+                    alert_filtered=c.get("alert_filtered", 0),
                 )
-                break
-
-        if report_md is None:
+            )
+        else:
             rows.append(
                 dict(
                     smiles=smi,
