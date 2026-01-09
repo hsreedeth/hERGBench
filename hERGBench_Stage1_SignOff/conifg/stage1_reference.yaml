@@ -2,7 +2,7 @@
 # Adjust paths (important)
 project:
   project_name: "hergbench"
-  run_name: "stage1_mvp"
+  run_name: "stage1_signoff"
 
 repro:
   seed: 42
@@ -25,11 +25,11 @@ stage1:
     label_col: "Y"
 
   splits:
-    types: ["cluster"]   # per protocol, temporarily set to clust only. change back after cftest.
+    types: ["cluster"]   # have to confirm if the stage-1 signoff is wired to handle all 3.
     frac_train: 0.80
     frac_val: 0.10
     frac_test: 0.10
-    seeds: [11]
+    seeds: [11] # have to confirm if the stage-1 signoff is wired to handle all 3.
     butina_cutoff: 0.60        # Tanimoto similarity cutoff for Butina
     force_resplit: false
 
@@ -54,7 +54,8 @@ stage1:
 
   counterfactuals:
     enable: true
-    selection: "high_risk"     # per protocol: perturb high-risk predictions
+    selection: "panel_csv"     # panel run.
+    panel_csv: "reports/runs/2026-01-08_161257_seed42_stage1_signoff/panel/panel.csv"
     high_risk_p: 0.7
     safe_p: 0.3                # Tier-1 flip only; Tier-2/3 governed by delta_min thresholds
     exmol_preset: "medium"

@@ -5,6 +5,10 @@ from pathlib import Path
 import pandas as pd
 
 def main() -> None:
+    '''
+    derive_split_frame.py: takes herg_clean.csv + a split assignment CSV (data/splits/cluster_seed11.csv) and 
+    materializes a concrete train_frame.csv (or val/test) by joining on mol_id
+    '''
     ap = argparse.ArgumentParser()
     ap.add_argument("--dataset-csv", required=True)   # herg_clean.csv
     ap.add_argument("--splits-csv", required=True)    # e.g., data/splits/cluster_seed11.csv

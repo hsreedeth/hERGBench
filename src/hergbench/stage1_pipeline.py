@@ -153,6 +153,8 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
     cf_nmols = int(cf_cfg_raw.get("nmols", 5))
     cf_max_targets = int(cf_cfg_raw.get("max_targets", 20))
     cf_selection = str(cf_cfg_raw.get("selection", "high_risk"))
+    cf_panel_csv = cf_cfg_raw.get("panel_csv", None)
+    cf_panel_csv = Path(cf_panel_csv) if cf_panel_csv else None
     high_risk_p = float(cf_cfg_raw.get("high_risk_p", 0.7))
     safe_p = float(cf_cfg_raw.get("safe_p", 0.3))
     exmol_preset = str(cf_cfg_raw.get("exmol_preset", "medium"))
@@ -371,6 +373,21 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
         if pred_path0.exists() and split_csv0.exists() and model_path0.exists():
             df_pred0 = pd.read_csv(pred_path0)
 
+            # Optional panel-driven selection: only generate reports for molecules listed in panel.csv
+            if cf_selection == "panel_csv":
+                if cf_panel_csv is None or (not cf_panel_csv.exists()):
+                    raise FileNotFoundError(f"counterfactuals.panel_csv not found: {cf_panel_csv}")
+
+                panel_df = pd.read_csv(cf_panel_csv)
+                if "smiles" not in panel_df.columns:
+                    raise ValueError("panel_csv must include a 'smiles' column")
+
+                panel_smiles = set(panel_df["smiles"].astype(str).tolist())
+                before = len(df_pred0)
+                df_pred0 = df_pred0[df_pred0["smiles"].astype(str).isin(panel_smiles)].copy()
+                logger.info("Panel-driven CF selection: %d -> %d candidates from %s", before, len(df_pred0), str(cf_panel_csv))
+
+
             # Load calibrated model bundle
             bundle = joblib.load(model_path0)
             cal_model = bundle["cal_model"]
@@ -397,6 +414,8 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                 if cf_selection == "high_risk" and p >= high_risk_p:
                     lead_candidates.append({"mol_id": str(mol_id), "smiles": str(smi), "y": y, "p": p})
                 elif cf_selection == "false_positives" and (y == 0) and (y_pred == 1):
+                    lead_candidates.append({"mol_id": str(mol_id), "smiles": str(smi), "y": y, "p": p})
+                elif cf_selection == "panel_csv":
                     lead_candidates.append({"mol_id": str(mol_id), "smiles": str(smi), "y": y, "p": p})
 
             if not lead_candidates and cf_selection == "high_risk":
@@ -484,6 +503,21 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
 
                 seen_std = set()
                 normalized: List[Dict[str, Any]] = []
+
+                def tier_from_std(p_cf: float, base_p: float, threshold: float, delta_min: float, delta_min_tier3: float) -> int:
+                    # Tier 1: class flip (prob below threshold)
+                    if p_cf < (threshold - 1e-6):
+                        return 1
+                    # Tier 2: meaningful reduction
+                    if (base_p - p_cf) >= delta_min:
+                        return 2
+                    # Tier 3: weaker reduction
+                    if (base_p - p_cf) >= delta_min_tier3:
+                        return 3
+                    return 4
+
+                tier_label_map = {1: "flip", 2: "risk_reduction", 3: "weak_improvement", 4: "diagnostic_close_edits"}
+
                 for cf in cfs:
                     raw = cf.get("smiles")
                     std_smi, std_mol = _std_for_scoring(raw, std_cfg)
@@ -502,12 +536,26 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                     props_std = mol_props(std_mol)
                     alert_std = has_structural_alerts(std_mol) if constraints.pains else False
 
+                    tier_raw = cf.get("tier")
+                    p_raw = cf.get("p")
+                    delta_raw = cf.get("delta_p")
+
+                    tier_num = tier_from_std(p_std, base_std_p, threshold, cf_delta_min, cf_delta_min_tier3)
+                    tier_label_std = tier_label_map[tier_num]
+
                     cf["raw_smiles"] = raw
                     cf["smiles"] = std_smi
                     cf["_std_mol"] = std_mol
                     cf["similarity"] = sim_to_train
                     cf["p"] = p_std
                     cf["delta_p"] = delta_std
+                    cf["p_raw"] = p_raw
+                    cf["delta_p_raw"] = delta_raw
+                    cf["tier_raw"] = tier_raw
+                    cf["tier_num_std"] = tier_num
+                    cf["tier_label_std"] = tier_label_std
+                    # Overwrite canonical tier used downstream to reflect standardized scoring
+                    cf["tier"] = tier_label_std
                     cf["logp"] = props_std["logp"]
                     cf["qed"] = props_std["qed"]
                     cf["sascore"] = props_std["sascore"]
@@ -552,6 +600,14 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                     cf_diag["final_relaxation_desc"] = "dataset fallback"
                     cf_diag["final_count"] = len(dataset_fallback)
                     cf_diag["scarcity"] = False if dataset_fallback else True
+
+                # Reconcile final tier/label/count with standardized survivors if any
+                if cfs:
+                    best_tier_num = min([cf.get("tier_num_std", 4) for cf in cfs]) if cfs else 4
+                    cf_diag["final_tier"] = tier_label_map.get(best_tier_num, cf_diag.get("final_tier"))
+                    cf_diag["final_tier_label"] = cf_diag.get("final_tier_label", tier_label_map.get(best_tier_num))
+                    cf_diag["final_count"] = len(cfs)
+                    cf_diag["scarcity"] = len(cfs) == 0
 
 
                 if cf_diag:

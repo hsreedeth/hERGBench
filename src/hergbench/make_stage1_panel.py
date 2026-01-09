@@ -10,6 +10,13 @@ import pandas as pd
 from rdkit import Chem, DataStructs
 from rdkit.Chem import AllChem
 
+'''
+takes the processed dataset (must include smiles,label) and a train_frame.csv, 
+    computes max_sim_to_train for all molecules using ECFP4 Tanimoto, 
+    then samples a panel across similarity bins. 
+    outputs 'panel.csv' with smiles,label,max_sim_to_train
+'''
+
 # ECFP4
 def fp_ecfp4(smiles: str, nbits: int = 2048):
     m = Chem.MolFromSmiles(smiles)
