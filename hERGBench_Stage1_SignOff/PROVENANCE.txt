@@ -1,0 +1,15 @@
+panel_csv: configs/panels/stage1_signoff_panel_seed42_n30_with_labels.csv
+lead_reports_dir: hERGBench_Stage1_SignOff/inputs/reports/runs/lead_reports 
+benchmark_results_csv: reports/runs/2026-01-09_195103_seed42_stage1_signoff/tables/benchmark_results.csv
+
+signoff script:
+SIGNOFF_ROOT="hERGBench_Stage1_SignOff"
+RUN_DIR="reports/runs/2026-01-09_195103_seed42_stage1_signoff"
+RUN_LEADS="$RUN_DIR/lead_reports"
+RUN_BENCH="$RUN_DIR/tables/benchmark_results.csv"
+PANEL_CSV="$SIGNOFF_ROOT/inputs/panel/panel.csv"
+
+
+
+
+
