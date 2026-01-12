@@ -238,16 +238,42 @@ def write_attrition_table_for_failures(
         smi = row["smiles"]
         if smi in report_map:
             _, data = report_map[smi]
-            attempts = data.get("cf_summary", {}).get("attempts", [])
-            final = attempts[-1] if attempts else {}
-            c = final.get("counts", {})
+            # attempts = data.get("cf_summary", {}).get("attempts", [])
+            # final = attempts[-1] if attempts else {}
+            # c = final.get("counts", {})
+            cf_summary = data.get("cf_summary", {}) or {}
+            attempts = cf_summary.get("attempts", []) or []
+
+            # source of actual truth : standardized final outcome (post-normalization)
+            final_best_tier_num = int(cf_summary.get("final_best_tier_num", 4))
+            final_tier_label = (
+                cf_summary.get("final_tier_label")
+                or cf_summary.get("final_tier")
+                or TIER_LABEL_FALLBACK.get(final_best_tier_num, "Tier 4 — Diagnostic close edits")
+            )
+            final_relaxation = cf_summary.get("final_relaxation")
+
+            # Attempt counts: pick the attempt that most plausibly corresponds to the final run.
+            # Prefer matching final_relaxation; break ties by max kept.
+            chosen = None
+            if attempts:
+                candidates = attempts
+                if final_relaxation is not None:
+                    candidates = [a for a in attempts if a.get("relaxation") == final_relaxation] or attempts
+                chosen = max(candidates, key=lambda a: (a.get("counts", {}) or {}).get("kept", 0))
+            chosen = chosen or {}
+            c = chosen.get("counts", {}) or {}
             rows.append(
                 dict(
                     smiles=smi,
                     max_sim_to_train=float(row["max_sim_to_train"]),
                     ad_bin=row["ad_bin"],
-                    final_tier=final.get("tier_label", final.get("tier")),
-                    relaxation=final.get("relaxation"),
+                    # final_tier=final.get("tier_label", final.get("tier")),
+                    # relaxation=final.get("relaxation"),
+                    final_tier=final_tier_label,
+                    relaxation=final_relaxation,
+                    attempt_tier=chosen.get("tier_label", chosen.get("tier")),
+                    attempt_relaxation=chosen.get("relaxation"),
                     sampled=c.get("sampled", 0),
                     kept=c.get("kept", 0),
                     invalid=c.get("invalid", 0),
@@ -269,6 +295,8 @@ def write_attrition_table_for_failures(
                     ad_bin=row["ad_bin"],
                     final_tier="(report not found)",
                     relaxation=None,
+                    attempt = None,
+                    attempt_relaxation = None,
                     sampled=None,
                     kept=None,
                     invalid=None,
