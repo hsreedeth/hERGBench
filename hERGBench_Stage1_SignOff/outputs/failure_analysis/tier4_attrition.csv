@@ -1,6 +1,6 @@
-smiles,max_sim_to_train,ad_bin,final_tier,relaxation,sampled,kept,invalid,duplicate,similarity_filtered,prob_filtered,delta_filtered,sa_filtered,logp_filtered,qed_filtered,alert_filtered
-CCCc1nc(C)c2c(=O)[nH]c(-c3cc(S(=O)(=O)N4CC[NH+](CC)CC4)ccc3OCC)nn12,0.1875,<0.3,Tier 1 — Flip,none,1570,35,0,4,1209,289,0,6,2,0,25
-O=C(c1ccccc1F)c1ccccc1F,0.217391304347826,<0.3,Tier 3 — Weak improvement,relax_sa_5.5,1032,0,0,31,993,0,8,0,0,0,0
-C#C[C@]1(O)CC[C@H]2[C@@H]3CCC4=Cc5oncc5C[C@]4(C)[C@H]3CC[C@@]21C,0.2375,<0.3,Tier 3 — Weak improvement,relax_sa_5.5,1543,0,0,2,1487,0,54,0,0,0,0
-O=C1N(Cc2ccccc2)[C@@H]2[C@H]3CCC[S+]3C[C@@H]2N1Cc1ccccc1,0.2394366197183098,<0.3,Tier 1 — Flip,relax_flip_0.4,1427,1,0,3,838,536,0,21,0,0,28
-CNS(=O)(=O)Cc1ccc2[nH]cc(CC[NH+](C)C)c2c1,0.2459016393442623,<0.3,Tier 1 — Flip,none,1310,7,0,4,1074,219,0,0,1,0,5
+smiles,max_sim_to_train,ad_bin,final_tier,relaxation,attempt_tier,attempt_relaxation,sampled,kept,invalid,duplicate,similarity_filtered,prob_filtered,delta_filtered,sa_filtered,logp_filtered,qed_filtered,alert_filtered
+CCCc1nc(C)c2c(=O)[nH]c(-c3cc(S(=O)(=O)N4CC[NH+](CC)CC4)ccc3OCC)nn12,0.1875,<0.3,diagnostic_close_edits,none,Tier 1 — Flip,none,1570,35,0,4,1209,289,0,6,2,0,25
+O=C(c1ccccc1F)c1ccccc1F,0.217391304347826,<0.3,diagnostic_close_edits,none,Tier 1 — Flip,none,1032,0,0,31,859,141,0,0,1,0,0
+C#C[C@]1(O)CC[C@H]2[C@@H]3CCC4=Cc5oncc5C[C@]4(C)[C@H]3CC[C@@]21C,0.2375,<0.3,diagnostic_close_edits,none,Tier 1 — Flip,none,1543,0,0,2,1167,357,0,17,0,0,0
+O=C1N(Cc2ccccc2)[C@@H]2[C@H]3CCC[S+]3C[C@@H]2N1Cc1ccccc1,0.2394366197183098,<0.3,diagnostic_close_edits,relax_flip_0.4,Tier 1 — Flip,relax_flip_0.4,1427,1,0,3,838,536,0,21,0,0,28
+CNS(=O)(=O)Cc1ccc2[nH]cc(CC[NH+](C)C)c2c1,0.2459016393442623,<0.3,diagnostic_close_edits,none,Tier 1 — Flip,none,1310,7,0,4,1074,219,0,0,1,0,5
