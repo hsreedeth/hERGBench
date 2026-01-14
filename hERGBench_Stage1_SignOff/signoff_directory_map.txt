@@ -1,38 +1,53 @@
-hERGBench_Stage1_SignOff/
-├── MANIFEST.sha256                 # (Hashes of all critical files)
-├── README_SIGNOFF.md               # Explanation (brief)
+hergbench_stage1_signoff/
+├── MANIFEST.sha256                 # Hashes for recorded files.
+├── PROVENANCE.txt                  # Provenance and origin notes.
+├── SIGNOFF.md                      # Stage 1 signoff document.
+├── SIGNOFF_NOTE.txt                # Additional signoff notes.
+├── .DS_Store                       # macOS Finder metadata.
 │
-├── config/
-│   └── stage1_reference_cluster_seed11.yaml  # exact run configs.
+├── conifg/
+│   ├── stage1_reference.yaml       # Reference run config for Stage 1.
+│   └── .DS_Store                   # macOS Finder metadata.
 │
 ├── environment/
-│   ├── git_commit.txt              # The specific commit hash head.
-│   ├── git_status_porcelain.txt    # cleean repo when started
-│   ├── pip_freeze.txt              #  lib versions
-│   └── python_version.txt          # Python runtime --version
+│   ├── git_commit.txt              # Git commit hash at run time.
+│   ├── git_status_porcelain.txt    # Clean/dirty repo snapshot.
+│   ├── pip_freeze.txt              # Python package versions.
+│   └── python_version.txt          # Python runtime version.
 │
-├── inputs/                         
-│   ├── splits/
-│   │   └── cluster_seed11.csv # The exact indices used (leak-proofed)
-│   └── panel/
-│       └── panel.csv    # The panel built with < 0 cases if sim == 1.0
+├── inputs/
+│   ├── .DS_Store                   # macOS Finder metadata.
+│   ├── benchmarks/
+│   │   └── benchmark_results.csv   # Reference benchmark results.
+│   ├── panel/
+│   │   ├── panel.csv               # Panel used for evaluation.
+│   │   ├── panel__.csv             # Alternate panel export.
+│   │   └── .DS_Store               # macOS Finder metadata.
+│   ├── reference_run.txt           # Reference run descriptor.
+│   ├── reports/
+│   │   ├── runs/                   # Run report bundle directory.
+│   │   └── .DS_Store               # macOS Finder metadata.
+│   └── splits/
+│       ├── candidates_notrain.csv  # Excluded candidates list.
+│       ├── cluster_seed11.csv      # Cluster split indices.
+│       └── train_frame.csv         # Training frame indices.
 │
-├── artifacts/                      # "The Frozen Brain"
-│   ├── model_cluster_seed11.joblib  # Trained XGBoost model
-│   └── model_meta_cluster_seed11.json     # contains calibration thresholds . metadata["calibration"]["threshold"].
+├── models_calibrators/
+│   ├── model_cluster_seed11.joblib # Trained model artifact.
+│   └── model_meta_cluster_seed11.json # Model metadata and thresholds.
 │
-└── outputs/              # this is not built yet. just a placeholde for concept.          
-    ├── metrics/
-    │   ├── yield_matrix.csv        # Yield stratified by AD Bin (Tier 1-3 vs Failure)
-    │   └── benchmark_summary.csv   # Global metrics (AUROC, AUPRC, Brier)
-    │
-    ├── lead_reports/               
-    │   ├── mol_A/ ...
-    │   ├── mol_B/ ...
-    │   └── index.html              # Navigation for the panel
-    │
-    └── failure_analysis/           # Failure Appendix
-        ├── tier4_attrition.csv     # Why they failed (SAscore? Similarity? QED?)
-        └── representative_failures/# few examples of Tier 4 outcomes
-            ├── failure_mol_X/ ...
-            └── failure_mol_Y/ ...
+└── outputs/
+    ├── .DS_Store                   # macOS Finder metadata.
+    ├── diagnostics/
+    │   ├── diagnostic_summary.txt  # Summary diagnostics.
+    │   └── per_molecule_diagnostics.csv # Per-molecule diagnostics.
+    ├── failure_analysis/
+    │   ├── .DS_Store               # macOS Finder metadata.
+    │   ├── representative_failures/ # Example failure folders.
+    │   ├── selected_failures.csv   # Selected failure cases.
+    │   └── tier4_attrition.csv     # Tier 4 attrition breakdown.
+    └── metrics/
+        ├── .DS_Store               # macOS Finder metadata.
+        ├── benchmark_summary.csv   # Benchmark summary metrics.
+        ├── yield_matrix.csv        # Yield matrix by AD bin.
+        └── yield_summary_by_ad_bin.csv # Yield summary by AD bin.
