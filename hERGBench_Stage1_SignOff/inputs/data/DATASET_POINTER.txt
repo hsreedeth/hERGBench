@@ -1,0 +1,6 @@
+dataset_logical_name: herg_clean.csv
+dataset_repo_path: data/processed/herg_clean.csv
+dataset_created_timestamp: 2025-12-30 01:51 Australia/Sydney
+dataset_sha256: 12dc938790af37796f991b4fffa9ccd00e02321014bbc1bb716477217bddc143
+standardization_config_version: git:5de6a65d0c8d300ad207db525a36ce3cfb03227b
+notes: Processed Stage-1 dataset artifact used for XGBoost+ECFP training/eval. File not copied into signoff bundle. integrity verified by sha256.
