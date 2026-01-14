@@ -24,3 +24,4 @@ Benchmark metrics are derived from the single benchmark_results.csv stored under
 ## Freeze
 All signoff artifacts under this folder are frozen and tracked by `MANIFEST.sha256`.
 
+Stage-1 signoff summary (single-seed benchmark, seed=11): Across the frozen 30-molecule panel, Tier1–3 counterfactual yield is concentrated in the high applicability-domain region (AD > 0.7: 2/3 molecules succeed) and is sparse at moderate similarity (0.5–0.7: 1/6 succeed), with no Tier1–3 successes observed below 0.5. This pattern is consistent with strict medicinal-chemist constraints and expected domain limitations under out-of-domain chemistry.
