@@ -1,0 +1,198 @@
+{
+  "timestamp": "2026-01-19T04:00:56.956570",
+  "python": "3.11.14 | packaged by conda-forge | (main, Oct 22 2025, 22:56:31) [Clang 19.1.7 ]",
+  "platform": "macOS-26.2-arm64-arm-64bit",
+  "git_commit": "cac41a1c0afe442a592b6b28b65d86d27a92005f",
+  "pip_freeze": [
+    "alembic==1.17.2",
+    "annotated-types==0.7.0",
+    "anyio==4.12.0",
+    "appnope @ file:///home/conda/feedstock_root/build_artifacts/appnope_1733332318622/work",
+    "asttokens @ file:///home/conda/feedstock_root/build_artifacts/asttokens_1763409923949/work",
+    "certifi==2026.1.4",
+    "charset-normalizer @ file:///home/conda/feedstock_root/build_artifacts/charset-normalizer_1760437218288/work",
+    "click @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_click_1764518652/work",
+    "colorlog==6.10.1",
+    "comm @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_comm_1753453984/work",
+    "contourpy @ file:///Users/runner/miniforge3/conda-bld/contourpy_1762525493111/work",
+    "cycler @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_cycler_1764466758/work",
+    "dataclasses==0.6",
+    "debugpy @ file:///Users/runner/miniforge3/conda-bld/bld/rattler-build_debugpy_1765840838/work",
+    "decorator @ file:///home/conda/feedstock_root/build_artifacts/decorator_1740384970518/work",
+    "distro==1.9.0",
+    "executing @ file:///home/conda/feedstock_root/build_artifacts/executing_1756729339227/work",
+    "exmol==3.3.0",
+    "filelock==3.20.2",
+    "fonttools @ file:///Users/runner/miniforge3/conda-bld/fonttools_1765632680641/work",
+    "freetype-py @ file:///home/conda/feedstock_root/build_artifacts/freetype-py_1650983368720/work",
+    "fsspec==2025.12.0",
+    "fuzzywuzzy==0.18.0",
+    "greenlet @ file:///Users/runner/miniforge3/conda-bld/greenlet_1764863753030/work",
+    "h11==0.16.0",
+    "hergbench==0.1.0",
+    "-e git+https://github.com/hsreedeth/hERGBench.git@cac41a1c0afe442a592b6b28b65d86d27a92005f#egg=hergbench_tdc",
+    "hf-xet==1.2.0",
+    "httpcore==1.0.9",
+    "httpx==0.28.1",
+    "huggingface_hub==1.2.3",
+    "idna==3.11",
+    "importlib_resources==6.5.2",
+    "ipykernel @ file:///Users/runner/miniforge3/conda-bld/bld/rattler-build_ipykernel_1761567969/work",
+    "ipython @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_ipython_1767621166/work",
+    "ipython_pygments_lexers @ file:///home/conda/feedstock_root/build_artifacts/ipython_pygments_lexers_1737123620466/work",
+    "jedi @ file:///home/conda/feedstock_root/build_artifacts/jedi_1733300866624/work",
+    "jiter==0.12.0",
+    "joblib==1.5.3",
+    "jupyter_client @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_jupyter_client_1767954655/work",
+    "jupyter_core @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_jupyter_core_1760643864/work",
+    "kiwisolver @ file:///Users/runner/miniforge3/conda-bld/bld/rattler-build_kiwisolver_1762488860/work",
+    "Mako==1.3.10",
+    "markdown-it-py @ file:///home/conda/feedstock_root/build_artifacts/markdown-it-py_1754951200865/work",
+    "MarkupSafe==3.0.3",
+    "matplotlib==3.10.8",
+    "matplotlib-inline @ file:///home/conda/feedstock_root/build_artifacts/matplotlib-inline_1761214490209/work",
+    "mdurl @ file:///home/conda/feedstock_root/build_artifacts/mdurl_1733255585584/work",
+    "munkres==1.1.4",
+    "narwhals==2.14.0",
+    "nest_asyncio @ file:///home/conda/feedstock_root/build_artifacts/nest-asyncio_1733325553580/work",
+    "numpy @ file:///Users/runner/miniforge3/conda-bld/numpy_1707225640867/work/dist/numpy-1.26.4-cp311-cp311-macosx_11_0_arm64.whl#sha256=b62b8b824024855c3eb209bd45bfcf60bc9a11b94cbf9d5b7b25dc503021e672",
+    "openai==2.14.0",
+    "optuna==4.6.0",
+    "packaging @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_packaging_1745345660/work",
+    "pandas @ file:///Users/runner/miniforge3/conda-bld/pandas_1702057232770/work",
+    "parso @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_parso_1755974222/work",
+    "pexpect @ file:///home/conda/feedstock_root/build_artifacts/pexpect_1733301927746/work",
+    "pillow==12.1.0",
+    "platformdirs @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_platformdirs_1764950726/work",
+    "plotly==6.5.0",
+    "prompt_toolkit @ file:///home/conda/feedstock_root/build_artifacts/prompt-toolkit_1756321756983/work",
+    "psutil @ file:///Users/runner/miniforge3/conda-bld/bld/rattler-build_psutil_1767012488/work",
+    "ptyprocess @ file:///home/conda/feedstock_root/build_artifacts/ptyprocess_1733302279685/work/dist/ptyprocess-0.7.0-py2.py3-none-any.whl#sha256=92c32ff62b5fd8cf325bec5ab90d7be3d2a8ca8c8a3813ff487a8d2002630d1f",
+    "pure_eval @ file:///home/conda/feedstock_root/build_artifacts/pure_eval_1733569405015/work",
+    "pycairo==1.29.0",
+    "pydantic==2.12.5",
+    "pydantic_core==2.41.5",
+    "Pygments @ file:///home/conda/feedstock_root/build_artifacts/pygments_1750615794071/work",
+    "pyparsing @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_pyparsing_1766475444/work",
+    "PyTDC==0.4.1",
+    "python-dateutil @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_python-dateutil_1751104122/work",
+    "pytz @ file:///home/conda/feedstock_root/build_artifacts/pytz_1742920838005/work",
+    "PyYAML==6.0.3",
+    "pyzmq @ file:///Users/runner/miniforge3/conda-bld/bld/rattler-build_pyzmq_1757387159/work",
+    "ratelimit==2.2.1",
+    "rdkit @ file:///Users/runner/miniforge3/conda-bld/rdkit_1711521335544/work",
+    "rdkit-pypi==2022.9.5",
+    "reportlab @ file:///Users/runner/miniforge3/conda-bld/reportlab_1766324050937/work",
+    "requests==2.32.5",
+    "rich @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_rich_1760026188/work/dist",
+    "rlPyCairo @ file:///home/conda/feedstock_root/build_artifacts/rlpycairo_1756864152814/work",
+    "scikit-learn==1.8.0",
+    "scipy==1.16.3",
+    "seaborn==0.13.2",
+    "selfies==2.2.0",
+    "shellingham @ file:///home/conda/feedstock_root/build_artifacts/shellingham_1762858192781/work",
+    "six @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_six_1753199211/work",
+    "skunk==1.3.0",
+    "sniffio==1.3.1",
+    "SQLAlchemy @ file:///Users/runner/miniforge3/conda-bld/sqlalchemy_1765351934917/work",
+    "stack_data @ file:///home/conda/feedstock_root/build_artifacts/stack_data_1733569443808/work",
+    "synspace==1.0.0",
+    "threadpoolctl==3.6.0",
+    "tornado @ file:///Users/runner/miniforge3/conda-bld/tornado_1765836484236/work",
+    "tqdm==4.67.1",
+    "traitlets @ file:///home/conda/feedstock_root/build_artifacts/traitlets_1733367359838/work",
+    "typer==0.21.0",
+    "typer-slim==0.21.0",
+    "typing-inspection==0.4.2",
+    "typing_extensions @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_typing_extensions_1756220668/work",
+    "tzdata @ file:///home/conda/feedstock_root/build_artifacts/python-tzdata_1765719872007/work",
+    "unicodedata2 @ file:///Users/runner/miniforge3/conda-bld/unicodedata2_1763054903095/work",
+    "urllib3==2.6.2",
+    "wcwidth @ file:///home/conda/feedstock_root/build_artifacts/wcwidth_1758622279606/work",
+    "xgboost @ file:///home/conda/feedstock_root/build_artifacts/xgboost-split_1713397725960/work/python-package"
+  ],
+  "config": {
+    "project": {
+      "project_name": "hergbench",
+      "run_name": "seed22_split11_qc"
+    },
+    "repro": {
+      "seed": 22
+    },
+    "paths": {
+      "data_raw": "data/raw",
+      "data_processed": "data/processed",
+      "data_splits": "data/splits",
+      "reports_root": "reports",
+      "runs_root": "reports/runs"
+    },
+    "logging": {
+      "level": "INFO"
+    },
+    "stage1": {
+      "dataset": {
+        "tdc_task": "Tox",
+        "name": "hERG",
+        "smiles_col": "Drug",
+        "label_col": "Y"
+      },
+      "splits": {
+        "types": [
+          "cluster"
+        ],
+        "frac_train": 0.8,
+        "frac_val": 0.1,
+        "frac_test": 0.1,
+        "seeds": [
+          11
+        ],
+        "butina_cutoff": 0.6,
+        "force_resplit": false
+      },
+      "features": {
+        "radius": 2,
+        "n_bits": 2048
+      },
+      "model": {
+        "objective": "aucpr",
+        "optuna_trials": 75,
+        "early_stopping_rounds": 50,
+        "max_estimators": 4000
+      },
+      "calibration": {
+        "method": "isotonic",
+        "threshold_metric": "youden",
+        "n_bins": 10
+      },
+      "eval": {
+        "bootstrap_B": 2000,
+        "bins": [
+          0.3,
+          0.5,
+          0.7
+        ]
+      },
+      "counterfactuals": {
+        "enable": false,
+        "selection": "high_risk",
+        "high_risk_p": 0.7,
+        "safe_p": 0.3,
+        "exmol_preset": "medium",
+        "exmol_n_samples": 1800,
+        "nmols": 5,
+        "delta_min": 0.1,
+        "delta_min_tier3": 0.05,
+        "max_targets": 20,
+        "relaxations": [],
+        "constraints": {
+          "min_tanimoto_flip": 0.5,
+          "min_tanimoto_improve": 0.7,
+          "sa_max": 4.5,
+          "logp_delta_max": 1.5,
+          "qed_min": 0.0,
+          "pains": true
+        }
+      }
+    }
+  }
+}

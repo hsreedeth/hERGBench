@@ -1,0 +1,17 @@
+[2026-01-19 04:00:56,955] INFO - Starting Stage 1 run: 2026-01-19_040056_seed22_seed22_split11_qc
+[2026-01-19 04:00:56,956] INFO - Global seed set to 22
+[2026-01-19 04:00:57,333] INFO - Wrote run metadata and resolved config
+[2026-01-19 04:01:02,672] INFO - Fetched TDC dataset 'hERG' with 655 rows and columns: ['Drug_ID', 'Drug', 'Y']
+[2026-01-19 04:01:02,675] INFO - Saved raw dataset to data/raw/tdc_herg_raw.csv
+[2026-01-19 04:01:07,200] INFO - Standardized molecules: kept=655, dropped_invalid=0
+[2026-01-19 04:01:07,203] WARNING - Dropping 3 SMILES with conflicting labels after standardization.
+[2026-01-19 04:01:07,204] INFO - Deduplicated: 649 -> 635 unique molecules
+[2026-01-19 04:01:07,206] INFO - Saved processed dataset to data/processed/herg_clean.csv
+[2026-01-19 04:01:07,331] INFO - Stage1: split=cluster seed=11
+[2026-01-19 04:01:07,331] INFO - Using sigmoid calibration for cluster split to reduce overfitting risk.
+[2026-01-19 04:01:07,480] INFO - scale_pos_weight=0.399 (train pos=363 neg=145)
+[2026-01-19 04:01:22,640] INFO - Best val aucpr=0.9406 with params={'learning_rate': 0.2624440644733788, 'max_depth': 6, 'min_child_weight': 0.7500022101651357, 'subsample': 0.7352182303412644, 'colsample_bytree': 0.7658947973440318, 'reg_alpha': 0.00011525159216281488, 'reg_lambda': 7.027996622799191e-07, 'gamma': 1.2064975020615174}
+[2026-01-19 04:01:26,323] INFO - Wrote reports/runs/2026-01-19_040056_seed22_seed22_split11_qc/tables/benchmark_results.csv
+[2026-01-19 04:01:26,842] INFO - Wrote reports/runs/2026-01-19_040056_seed22_seed22_split11_qc/tables/applicability_domain_bins.csv
+[2026-01-19 04:01:26,843] INFO - Stage 1 completed.
+[2026-01-19 04:01:26,843] INFO - Stage 1 completed successfully. Artifacts at: reports/runs/2026-01-19_040056_seed22_seed22_split11_qc
