@@ -80,3 +80,105 @@ reports/runs/<run_id>/            # Per-run outputs (tables, figures, models, le
 src/hergbench/                    # Pipeline code
 ```
 
+---
+
+## Installation
+
+Python 3.11+ required. RDKit must be available in your environment (conda recommended).
+
+```bash
+pip install -e .
+```
+
+---
+
+## Quickstart
+
+**Stage 0 smoke test**
+
+```bash
+make run
+```
+
+**Stage 0 + optional data fetch**
+
+```bash
+make run-fetch
+```
+
+**Stage 1 baseline + counterfactual lead optimization**
+
+```bash
+make stage1
+```
+
+**Stage 1 without counterfactuals (faster iteration)**
+
+```bash
+make stage1-fast
+```
+
+---
+
+## Configuration
+
+Stage 1 behavior is controlled via YAML (example: `configs/stage1_mvp.yaml`), typically covering:
+
+* Split types + seeds + (optional) Butina cutoff
+* Fingerprint parameters (radius, bits)
+* Optuna trials / early stopping
+* Calibration method + threshold selection
+* Counterfactual generation and medicinal constraints
+
+If your repo exposes a CLI entrypoint, run Stage 1 with:
+
+```bash
+# Example (adjust to match your CLI wiring)
+python -m hergbench.cli stage1 -c configs/stage1_mvp.yaml
+```
+
+If not, use the Make targets above.
+
+---
+
+## Outputs (Stage 1)
+
+Each run creates a timestamped folder under `reports/runs/<run_id>/` with a consistent structure. Common artifacts include:
+
+* `tables/benchmark_results.csv` — per-split metrics (e.g., AUROC, AUPRC, F1, balanced accuracy, Brier)
+* `tables/*ad*` — applicability-domain stratified reporting (by similarity-to-train bins)
+* `predictions/` — calibrated test predictions
+* `lead_reports/` — per-molecule counterfactual reports (report.md + report.json + trace counts)
+
+### QC artifacts
+
+Stage 1 counterfactuals have a QC table/report (paths may vary by run):
+
+* `reports/qc/stage1_prescription_qc_report.md`
+* `reports/qc/stage1_prescription_qc_table.csv`
+
+---
+
+## Notes on interpretation (important)
+
+* “Tier 1–3 yield” is intentionally **stratified by AD** because practical utility depends on chemical proximity to the training distribution.
+* A “flip” is treated as a **hypothesis**, not a guarantee; Stage 2 (and multi-seed comparisons) exist to test stability.
+
+---
+
+## Development
+
+```bash
+make lint
+make format
+```
+
+---
+
+## Disclaimer
+
+This repository is a research pipeline for model development and evaluation. It is not a clinical decision tool and is not validated for clinical use.
+
+```
+::contentReference[oaicite:0]{index=0}
+```
