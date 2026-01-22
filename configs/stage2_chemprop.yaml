@@ -18,6 +18,11 @@ splits:
 
 chemprop:
   # CLI-fied config (ChemProp v2)
+  chemprop:
+  accelerator: cpu
+  devices: 1
+  num_workers: 0
+
   task_type: classification
   metrics: [prc, roc]
   tracking_metric: prc
