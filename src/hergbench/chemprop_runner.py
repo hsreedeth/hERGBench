@@ -5,6 +5,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
+import sys
 
 
 @dataclass(frozen=True)
@@ -58,7 +59,7 @@ def chemprop_train(cfg: ChemPropTrainConfig) -> Path:
     """
     cfg.output_dir.mkdir(parents=True, exist_ok=True)
 
-    cmd = [
+    cmd = [ sys.executable,
         "chemprop", "train",
         "-i", str(cfg.data_path),
         "-o", str(cfg.output_dir),
@@ -95,7 +96,7 @@ def chemprop_predict(model_dir: Path, data_path: Path, smiles_col: str, out_path
     """
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    cmd = [
+    cmd = [ sys.executable,
         "chemprop", "predict",
         "-i", str(data_path),
         "--smiles-columns", smiles_col,
