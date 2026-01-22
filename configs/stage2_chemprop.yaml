@@ -1,0 +1,55 @@
+stage: 2
+run_name: stage2_chemprop_dmnn
+
+data:
+  path: data/processed/herg_clean.csv
+  smiles_col: smiles
+  target_col: y
+  # maybe useful to hard-lock the artifact later.
+  sha256: null
+
+splits:
+  # must come from Stage 1 (exact membership) non-nego.
+  membership_path: hergbench_stage1_signoff/inputs/splits/cluster_seed11.csv
+  # membership file must have either:
+  #   a. join_key + split  OR  b. row_idx + split (key: mol_id here, consistency checked √)
+  join_key: mol_id           # fallback: smiles if mol_id absent
+  split_col: split           # expected: train/val/test
+
+chemprop:
+  # CLI-fied config (ChemProp v2)
+  task_type: classification
+  metrics: [prc, roc]
+  tracking_metric: prc
+  epochs: 80
+  patience: 10
+
+  batch_size: 64
+  num_workers: 4
+
+  message_hidden_dim: 300
+  depth: 3
+  dropout: 0.0
+
+  init_lr: 1.0e-4
+  max_lr: 1.0e-3
+  final_lr: 1.0e-4
+  warmup_epochs: 2
+
+  data_seed: 42
+  pytorch_seed: 42
+  accelerator: auto
+  devices: auto
+
+calibration:
+  # same as Stage 1 (Platt/sigmoid)
+  enabled: true
+  method: platt
+  eps: 1.0e-6
+
+evaluation:
+  ad_bins: [0.3, 0.5, 0.7]
+
+reporting:
+  run_root: reports/runs
+  save_preds: true
