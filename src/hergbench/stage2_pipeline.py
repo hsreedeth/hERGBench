@@ -10,7 +10,7 @@ import pandas as pd
 import yaml
 
 from hergbench.data.split_apply import apply_split_membership
-from hergbench.models.chemprop_runner import ChemPropTrainConfig, chemprop_train, chemprop_predict
+from hergbench.chemprop_runner import ChemPropTrainConfig, chemprop_train, chemprop_predict
 
 
 def sha256_file(path: Path) -> str:
