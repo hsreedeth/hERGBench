@@ -1,5 +1,3 @@
-# Stage 1 MVP (baseline-only) with triple split types and medicinal-chemist counterfactual filter
-# Adjust paths (important)
 project:
   project_name: "hergbench"
   run_name: "seed22_split11_qc"
