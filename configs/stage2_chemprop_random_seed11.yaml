@@ -8,7 +8,7 @@ data:
   sha256: null  # recommend pinning after first successful run
 
 splits:
-  membership_path: hERGBench_Stage1_SignOff_v2_triple_seed11/inputs/splits/__SPLIT___seed11.csv
+  membership_path: hERGBench_Stage1_SignOff_v2_triple_seed11/inputs/splits/random_seed11.csv
   join_key: mol_id
   split_col: split
 
