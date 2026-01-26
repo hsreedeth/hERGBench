@@ -1,3 +1,5 @@
+# Gold Config. (all final stage freeze MUST use this.)
+
 project:
   project_name: "hergbench"
   run_name: "stage1_signoff"
