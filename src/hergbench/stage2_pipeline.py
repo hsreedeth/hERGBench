@@ -109,7 +109,7 @@ def main(config_path: str) -> None:
         "membership_path": str(membership_path),
         "train_config": asdict(train_cfg),
     }
-    (run_dir / "run_metadata.json").write_text(json.dumps(meta, indent=2))
+    (run_dir / "run_metadata.json").write_text(json.dumps(meta, indent=2, default=str))
 
     print(f"[OK] Stage 2 run created: {run_dir}")
 
