@@ -1,4 +1,5 @@
 .PHONY: run run-fetch stage1 stage1-fast stage1-refreeze stage1-mvp stage1-mvp-fast lint format
+@echo "[make] $@ → config=$(STAGE1_CFG)"
 
 # Default configs (override like: make stage1 STAGE1_CFG=... )
 RUN_CFG ?= configs/base.yaml
@@ -13,6 +14,7 @@ run-fetch:
 
 # triple-split signoff config as a safe default.
 stage1:
+	@echo "[make] $@ → config=$(STAGE1_CFG)"
 	hergbench stage1 -c $(STAGE1_CFG)
 
 stage1-fast:
@@ -20,6 +22,7 @@ stage1-fast:
 
 # always regenerate split membership files on refreezes.
 stage1-refreeze:
+	@echo "[make] $@ → config=$(STAGE1_CFG) (force respli)"
 	hergbench stage1 -c $(STAGE1_CFG) --force-resplit
 
 # targets can be named for now.(cluster only iteration)
