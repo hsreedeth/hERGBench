@@ -43,7 +43,8 @@ def main(config_path: str) -> None:
     # Create run dir
     ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     run_root = Path(cfg["reporting"]["run_root"])
-    run_dir = run_root / f"{ts}_stage2_chemprop_seed{cfg['chemprop']['pytorch_seed']}"
+    split_tag = Path(cfg["splits"]["membership_path"]).stem  # random_seed11 / scaffold_seed11 / cluster_seed11
+    run_dir = run_root / f"{ts}_stage2_chemprop_{split_tag}_torch{cfg['chemprop']['pytorch_seed']}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
     # Load frozen dataset
