@@ -92,7 +92,14 @@ def main(config_path: str) -> None:
 
     # Predict (write once; later filter by split)
     pred_path = run_dir / "predictions" / "preds.csv"
-    chemprop_predict(model_dir=model_dir, data_path=chemprop_input, smiles_col=smiles_col, out_path=pred_path)
+    chemprop_predict(
+        model_dir=model_dir,
+        data_path=chemprop_input,
+        smiles_col=smiles_col,
+        out_path=pred_path,
+        accelerator=str(cfg["chemprop"]["accelerator"]),
+        devices=str(cfg["chemprop"]["devices"]),
+    )
 
     # Write provenance bundle
     meta = {

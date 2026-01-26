@@ -100,7 +100,14 @@ def chemprop_train(cfg: ChemPropTrainConfig) -> Path:
     return cfg.output_dir
 
 
-def chemprop_predict(model_dir: Path, data_path: Path, smiles_col: str, out_path: Path) -> Path:
+def chemprop_predict(
+    model_dir: Path,
+    data_path: Path,
+    smiles_col: str,
+    out_path: Path,
+    accelerator: str | None = None,
+    devices: str | None = None,
+) -> Path:
     """
     Runs ChemProp prediction. Writes a CSV with predictions.
     """
@@ -121,5 +128,9 @@ def chemprop_predict(model_dir: Path, data_path: Path, smiles_col: str, out_path
         "--model-path", str(model_dir),
         "-o", str(out_path),
     ]
+    if accelerator:
+        cmd += ["--accelerator", str(accelerator)]
+    if devices:
+        cmd += ["--devices", str(devices)]
     _run(cmd)
     return out_path
