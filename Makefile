@@ -11,18 +11,18 @@ run:
 run-fetch:
 	hergbench run -c $(RUN_CFG) --fetch-data
 
-# SAFE DEFAULT: triple-split signoff config
+# triple-split signoff config as a safe default.
 stage1:
 	hergbench stage1 -c $(STAGE1_CFG)
 
 stage1-fast:
 	hergbench stage1 -c $(STAGE1_CFG) --skip-counterfactuals
 
-# REFREEZE: always regenerate split membership files
+# always regenerate split membership files on refreezes.
 stage1-refreeze:
 	hergbench stage1 -c $(STAGE1_CFG) --force-resplit
 
-# Keep MVP targets explicitly named (cluster-only iteration)
+# targets can be named for now.(cluster only iteration)
 stage1-mvp:
 	hergbench stage1 -c $(STAGE1_MVP_CFG)
 
