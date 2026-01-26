@@ -1,0 +1,23 @@
+Stage 1 refreeze v2 (triple split, seed 11)
+
+Run directory:
+  reports/runs/2026-01-26_154921_seed42_stage1_signoff
+
+Frozen config:
+  config/stage1_reference.yaml  (copied from configs/stage1_signoff.yaml)
+
+Frozen benchmark table:
+  inputs/benchmarks/benchmark_results.csv  (copied from reports/runs/2026-01-26_154921_seed42_stage1_signoff/tables/benchmark_results.csv)
+
+Frozen split memberships:
+  inputs/splits/random_seed11.csv
+  inputs/splits/scaffold_seed11.csv
+  inputs/splits/cluster_seed11.csv
+
+Frozen models:
+  models_calibrators/model_random_seed11.joblib
+  models_calibrators/model_scaffold_seed11.joblib
+  models_calibrators/model_cluster_seed11.joblib
+
+Frozen lead reports:
+  inputs/reports/runs/lead_reports  (copied from reports/runs/2026-01-26_154921_seed42_stage1_signoff/lead_reports)

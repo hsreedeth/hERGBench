@@ -1,0 +1,134 @@
+{
+  "base_smiles_raw": "CC(C)(CN1CCC(=C2c3ccc(F)cc3COc3ccccc32)CC1)C(=O)O",
+  "base_smiles_std": "CC(C)(CN1CCC(=C2c3ccc(F)cc3COc3ccccc32)CC1)C(=O)O",
+  "cf_summary": {
+    "attempts": [
+      {
+        "counts": {
+          "alert_filtered": 1,
+          "delta_filtered": 0,
+          "delta_min_used": null,
+          "duplicate": 4,
+          "invalid": 0,
+          "kept": 1,
+          "logp_delta_max_used": 1.5,
+          "logp_filtered": 0,
+          "min_tanimoto_source": "min_tanimoto_flip",
+          "min_tanimoto_used": 0.5,
+          "pains_used": true,
+          "prob_filtered": 418,
+          "prob_max_used": 0.509999,
+          "qed_filtered": 0,
+          "qed_min_used": 0.0,
+          "sa_filtered": 0,
+          "sa_max_used": 4.5,
+          "sampled": 1449,
+          "similarity_filtered": 1025
+        },
+        "relaxation": "none",
+        "relaxation_desc": "baseline constraints",
+        "tier": "flip",
+        "tier_label": "Tier 1 \u2014 Flip"
+      }
+    ],
+    "dataset_fallback_count": 5,
+    "dataset_fallback_used": true,
+    "final_best_tier_num": 4,
+    "final_count": 1,
+    "final_count_tier123": 0,
+    "final_count_total": 1,
+    "final_relaxation": "none",
+    "final_relaxation_desc": "baseline constraints",
+    "final_tier": "diagnostic_close_edits",
+    "final_tier_label": "diagnostic_close_edits",
+    "relaxation_used": false,
+    "sample_budget": 1800,
+    "sample_error": null,
+    "sampled": 1449,
+    "scarcity": false,
+    "target_prob_max": 0.509999
+  },
+  "counterfactuals": [
+    {
+      "alert": false,
+      "delta_p_raw": 0.15727199740129427,
+      "delta_p_std": 0.15727199740129427,
+      "logp": 4.4638000000000035,
+      "p_raw": 0.5039384365386397,
+      "p_std": 0.5039384365386397,
+      "qed": 0.7866481483126112,
+      "raw_smiles": "C=C1C=C(F)C(OC)COc2ccccc2C1=C1CCN(CC(C)(C)C(=O)O)CC1",
+      "relaxation": "none",
+      "sascore": 4.106458673186733,
+      "similarity_to_train": 0.23404255319148937,
+      "smiles_std": "C=C1C=C(F)C(OC)COc2ccccc2C1=C1CCN(CC(C)(C)C(=O)O)CC1",
+      "tier_label_std": "diagnostic_close_edits",
+      "tier_num_std": 4,
+      "tier_raw": "flip"
+    }
+  ],
+  "dataset_analogues": [
+    {
+      "actionable": true,
+      "alert": false,
+      "delta_p": 0.2664209891671086,
+      "logp": -1.0397000000000005,
+      "p": 0.39478944477282535,
+      "qed": 0.5624722357827983,
+      "sascore": 2.5435777719868486,
+      "similarity": 0.06756756756756757,
+      "smiles": "Cn1c(=O)c2[nH]cnc2n(C)c1=O"
+    },
+    {
+      "actionable": false,
+      "alert": true,
+      "delta_p": 0.2664209891671086,
+      "logp": 0.5976899999999998,
+      "p": 0.39478944477282535,
+      "qed": 0.5014913838271434,
+      "sascore": 3.3037189467190657,
+      "similarity": 0.025974025974025976,
+      "smiles": "Nc1nc(=S)c2[nH]cnc2[nH]1"
+    },
+    {
+      "actionable": true,
+      "alert": false,
+      "delta_p": 0.2655879462955168,
+      "logp": 1.8598999999999999,
+      "p": 0.39562248764441715,
+      "qed": 0.5768274174598099,
+      "sascore": 4.048334026953259,
+      "similarity": 0.10126582278481013,
+      "smiles": "O=C(O)CNC(=O)C1NC(C(F)(F)F)(C(F)(F)F)OC1(C(F)(F)F)C(F)(F)F"
+    },
+    {
+      "actionable": false,
+      "alert": true,
+      "delta_p": 0.2655879462955168,
+      "logp": -2.0711999999999957,
+      "p": 0.39562248764441715,
+      "qed": 0.333294737123963,
+      "sascore": 2.171402762983991,
+      "similarity": 0.09836065573770492,
+      "smiles": "O=C(O)CN(CCN(CC(=O)O)CC(=O)O)CC(=O)O"
+    },
+    {
+      "actionable": true,
+      "alert": false,
+      "delta_p": 0.2655879462955168,
+      "logp": -1.8459000000000003,
+      "p": 0.39562248764441715,
+      "qed": 0.4738423616632481,
+      "sascore": 3.185883407216588,
+      "similarity": 0.0958904109589041,
+      "smiles": "NC(Cc1nn[nH]n1)C(=O)O"
+    }
+  ],
+  "max_sim_to_train": 0.2911392405063291,
+  "mol_id": "d8e681ab2b7868cc60b199e691c86069d2c5657c",
+  "p_base_raw": 0.661210433939934,
+  "p_base_std": 0.661210433939934,
+  "sim_bin": "<0.3",
+  "threshold": 0.51,
+  "y_true": 1
+}

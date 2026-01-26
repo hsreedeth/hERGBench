@@ -698,6 +698,9 @@ def run_stage1(cfg: Dict[str, Any], run_dir: Path, logger) -> None:
                             mol_id,
                             cf_diag.get("sampled"),
                         )
+                        
+                tiers = sorted({str(cf.get("tier", "<missing>")) for cf in cfs})
+                logger.info("DEBUG tiers for %s: %s", mol_id, tiers)
 
                 report_dir = lead_dir / mol_id
                 write_lead_report(

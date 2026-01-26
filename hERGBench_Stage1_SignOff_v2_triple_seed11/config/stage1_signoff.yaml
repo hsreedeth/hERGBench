@@ -1,0 +1,78 @@
+# Gold Config. (all final stage freeze MUST use this.)
+
+project:
+  project_name: "hergbench"
+  run_name: "stage1_signoff"
+
+repro:
+  seed: 42
+
+paths:
+  data_raw: "data/raw"
+  data_processed: "data/processed"
+  data_splits: "data/splits"
+  reports_root: "reports"
+  runs_root: "reports/runs"
+
+logging:
+  level: "INFO"
+
+stage1:
+  dataset:
+    tdc_task: "Tox"
+    name: "hERG"
+    smiles_col: "Drug"
+    label_col: "Y"
+
+  splits:
+    types: ["random", "scaffold", "cluster"]
+    frac_train: 0.80
+    frac_val: 0.10
+    frac_test: 0.10
+    seeds: [11]
+    butina_cutoff: 0.60
+    force_resplit: false
+
+  features:
+    radius: 2
+    n_bits: 2048
+
+  model:
+    objective: "aucpr"
+    optuna_trials: 75
+    early_stopping_rounds: 50
+    max_estimators: 4000
+
+  calibration:
+    method: "isotonic"
+    threshold_metric: "youden"
+    n_bins: 10
+
+  eval:
+    bootstrap_B: 2000
+    bins: [0.3, 0.5, 0.7]
+
+  counterfactuals:
+    enable: true
+    selection: "panel_csv"
+    panel_csv: "configs/panels/stage1_signoff_panel_seed42_n30.csv"
+
+    high_risk_p: 0.7
+    safe_p: 0.3
+    exmol_preset: "medium"
+    exmol_n_samples: 1800
+    nmols: 5
+    delta_min: 0.10
+    delta_min_tier3: 0.05
+
+    # Because selection=panel_csv, max_targets should be >= panel size.
+    max_targets: 30
+
+    relaxations: []
+    constraints:
+      min_tanimoto_flip: 0.5
+      min_tanimoto_improve: 0.7
+      sa_max: 4.5
+      logp_delta_max: 1.5
+      qed_min: 0.0
+      pains: true
