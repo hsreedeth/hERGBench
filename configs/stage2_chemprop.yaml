@@ -33,8 +33,8 @@ chemprop:
 
   data_seed: 42
   pytorch_seed: 42
-  accelerator: auto
-  devices: auto
+  accelerator: cpu
+  devices: 1
 
 calibration:
   enabled: true

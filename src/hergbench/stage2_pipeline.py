@@ -24,6 +24,13 @@ def sha256_file(path: Path) -> str:
 def main(config_path: str) -> None:
     cfg = yaml.safe_load(Path(config_path).read_text())
 
+    # Guard: force CPU to avoid MPS op gaps (e.g., scatter_reduce on Apple GPUs).
+    cfg.setdefault("chemprop", {})
+    if str(cfg["chemprop"].get("accelerator", "")).lower() != "cpu" or str(cfg["chemprop"].get("devices", "")) != "1":
+        print("[stage2_pipeline] Forcing ChemProp to CPU (accelerator=cpu, devices=1).")
+    cfg["chemprop"]["accelerator"] = "cpu"
+    cfg["chemprop"]["devices"] = "1"
+
     data_path = Path(cfg["data"]["path"])
     smiles_col = cfg["data"]["smiles_col"]
     target_col = cfg["data"]["target_col"]

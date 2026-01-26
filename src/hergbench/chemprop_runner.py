@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
-import sys
 
 
 @dataclass(frozen=True)
@@ -59,8 +60,17 @@ def chemprop_train(cfg: ChemPropTrainConfig) -> Path:
     """
     cfg.output_dir.mkdir(parents=True, exist_ok=True)
 
-    cmd = [ sys.executable,
-        "chemprop", "train",
+    chemprop_exe = shutil.which("chemprop")
+    if chemprop_exe:
+        base = [chemprop_exe]
+        print(f"[chemprop_runner] using CLI executable: {chemprop_exe}")
+    else:
+        # Use the chemprop module from the current Python environment.
+        base = [sys.executable, "-m", "chemprop"]
+        print(f"[chemprop_runner] using module: {sys.executable} -m chemprop")
+
+    cmd = base + [
+        "train",
         "-i", str(cfg.data_path),
         "-o", str(cfg.output_dir),
         "-s", cfg.smiles_col,
@@ -96,8 +106,16 @@ def chemprop_predict(model_dir: Path, data_path: Path, smiles_col: str, out_path
     """
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    cmd = [ sys.executable,
-        "chemprop", "predict",
+    chemprop_exe = shutil.which("chemprop")
+    if chemprop_exe:
+        base = [chemprop_exe]
+        print(f"[chemprop_runner] using CLI executable: {chemprop_exe}")
+    else:
+        base = [sys.executable, "-m", "chemprop"]
+        print(f"[chemprop_runner] using module: {sys.executable} -m chemprop")
+
+    cmd = base + [
+        "predict",
         "-i", str(data_path),
         "--smiles-columns", smiles_col,
         "--model-path", str(model_dir),
