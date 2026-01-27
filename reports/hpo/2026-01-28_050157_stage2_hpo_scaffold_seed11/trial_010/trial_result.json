@@ -1,0 +1,39 @@
+{
+  "val_auprc": 0.8481677931823861,
+  "params": {
+    "message_hidden_dim": 300,
+    "depth": 3,
+    "dropout": 0.1752707811229771,
+    "batch_size": 64,
+    "max_lr": 0.00162702483986074,
+    "init_lr": 5.845529354631095e-05,
+    "final_lr": 0.0007214994222979497
+  },
+  "train_cfg": {
+    "data_path": "reports/hpo/2026-01-28_050157_stage2_hpo_scaffold_seed11/trial_010/chemprop_input.csv",
+    "output_dir": "reports/hpo/2026-01-28_050157_stage2_hpo_scaffold_seed11/trial_010/models/chemprop_dmnn",
+    "smiles_col": "smiles",
+    "target_col": "y",
+    "task_type": "classification",
+    "metrics": [
+      "prc",
+      "roc"
+    ],
+    "tracking_metric": "prc",
+    "epochs": 80,
+    "patience": 10,
+    "batch_size": 64,
+    "num_workers": 4,
+    "message_hidden_dim": 300,
+    "depth": 3,
+    "dropout": 0.1752707811229771,
+    "init_lr": 5.845529354631095e-05,
+    "max_lr": 0.00162702483986074,
+    "final_lr": 0.0007214994222979497,
+    "warmup_epochs": 2,
+    "data_seed": 42,
+    "pytorch_seed": 42,
+    "accelerator": "cpu",
+    "devices": "1"
+  }
+}

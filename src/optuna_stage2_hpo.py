@@ -184,11 +184,17 @@ def main(split: str, n_trials: int) -> None:
         )
 
         # Save minimal provenance for the trial
-        (tdir / "trial_result.json").write_text(json.dumps({
-            "val_auprc": val_auprc,
-            "params": trial.params,
-            "train_cfg": asdict(train_cfg),
-        }, indent=2))
+        (tdir / "trial_result.json").write_text(
+            json.dumps(
+                {
+                    "val_auprc": val_auprc,
+                    "params": trial.params,
+                    "train_cfg": asdict(train_cfg),
+                },
+                indent=2,
+                default=str,
+            )
+        )
 
         return val_auprc
 
