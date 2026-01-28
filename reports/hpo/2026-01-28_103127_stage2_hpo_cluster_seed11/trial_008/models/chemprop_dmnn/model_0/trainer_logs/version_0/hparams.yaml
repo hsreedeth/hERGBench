@@ -1,0 +1,5 @@
+batch_norm: false
+final_lr: 0.00027411443039016643
+init_lr: 0.0002504946862558364
+max_lr: 0.0015728301401797115
+warmup_epochs: 2
