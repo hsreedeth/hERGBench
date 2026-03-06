@@ -58,7 +58,7 @@ Stage 1 provides:
 **6) Counterfactual lead optimization (ExMol)**
 - For selected high-risk compounds, generates local analogues.
 - Filters candidates with explicit medicinal constraints (validity, deduplication, alerts, SA, logP drift, optional QED).
-- Produces **per-molecule lead reports** <a href="https://github.com/hsreedeth/hERGBench/blob/main/hERGBench_Stage1_SignOff/inputs/reports/runs/lead_reports/20ae67ffe6fb365715533270623337b04f656686/report.md">(an example of the generated report)</a> with traceable “why kept / why rejected” summaries.
+- Produces **per-molecule lead reports** <a href="https://github.com/hsreedeth/hERGBench/blob/main/hERGBench_Stage1_SignOff_v2_triple_seed11/inputs/reports/runs/lead_reports/20ae67ffe6fb365715533270623337b04f656686/report.md">(an example of the generated report)</a> with traceable “why kept / why rejected” summaries.
 
 ---
 
