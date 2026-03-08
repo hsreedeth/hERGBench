@@ -33,10 +33,6 @@ Across runs, both models produce strong PR-focused performance, with the XGBoost
 
 ![Reliability plot (cluster split)](data/notebooks/reports/runs/2026-01-19_040056_seed22_seed22_split11_qc/figures/reliability_cluster.png)
 
-### Generalization stress snapshot (AUPRC)
-
-![Generalization gap AUPRC](data/notebooks/reports/runs/2026-01-19_040056_seed22_seed22_split11_qc/figures/generalization_gap_auprc.png)
-
 ---
 
 ## Applicability-domain view (XGBoost cluster run)
