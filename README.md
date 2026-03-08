@@ -4,8 +4,10 @@
 
 # hERGBench
 
-## Mini abstract (updated)
+## Mini abstract
 
+hERG liability refers to the propensity of a drug compound to inhibit the human Ether-à-go-go-Related Gene (
+) potassium channel, which can cause fatal cardiac arrhythmias (torsades de pointes) by delaying heart repolarization
 We built hERGBench to answer one high-impact question: **can we reliably flag hERG liability before synthesis, even when chemistry gets harder?**
 
 The answer from our current experiments is a clear **yes**. We now have successful end-to-end runs for both model families:
