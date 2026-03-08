@@ -50,7 +50,7 @@ Across runs, both models produce strong PR-focused performance, with the XGBoost
 
 ---
 
-## One-line message
+## Status
 
 **hERGBench now has two working model tracks, reproducible outputs, and a comparison-ready results stack—this benchmark is live, loud, and decision-useful.**
 
