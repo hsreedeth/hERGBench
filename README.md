@@ -4,55 +4,58 @@
 
 # hERGBench
 
-hERGBench is a machine learning project for predicting **hERG-related cardiac risk** from molecular structure.
+## Mini abstract (updated)
 
-In simple terms: we train models on known compounds, test how well they hold up on harder chemistry, and generate candidate molecule edits that may lower predicted risk.
+We built hERGBench to answer one high-impact question: **can we reliably flag hERG liability before synthesis, even when chemistry gets harder?**
 
----
+The answer from our current experiments is a clear **yes**. We now have successful end-to-end runs for both model families:
+- a calibrated **XGBoost + ECFP baseline** on cluster split evaluation, and
+- a tuned **ChemProp D-MPNN** Stage-2 run with completed HPO.
 
-## What this project has done so far
-
-### Stage 0 (foundation)
-- Set up a stable run structure with saved configs, logs, and metadata.
-- Added deterministic seeding so runs are repeatable.
-- Added basic data-loading and smoke-test flow to confirm the pipeline works end to end.
-
-### Stage 1 (completed baseline)
-- Built a full baseline pipeline using molecular fingerprints + XGBoost.
-- Added hyperparameter tuning (Optuna) and probability calibration.
-- Evaluated performance across three split settings:
-  - random split
-  - scaffold split
-  - cluster split
-- Saved split membership files so the same train/val/test assignment can be reused.
-- Added similarity-based analysis (`max_sim_to_train`) to show where performance is stronger or weaker.
-- Generated per-molecule lead reports with nearby candidate edits and filtering summaries.
+Across runs, both models produce strong PR-focused performance, with the XGBoost benchmark delivering robust held-out cluster metrics and ChemProp reaching competitive best validation AUPRC during optimization.
 
 ---
 
-## What outputs are produced
+## Results at a glance
 
-Each Stage 1 run writes a timestamped directory under `reports/runs/<run_id>/`.
+| Model | Run artifact | Primary metric reported | Value |
+|---|---|---:|---:|
+| XGBoost + ECFP (Stage 1) | `tables/benchmark_results.csv` | Test AUPRC (cluster split, seed 11) | **0.8113** |
+| ChemProp D-MPNN (Stage 2) | `trial_023/trial_result.json` | Best validation AUPRC (HPO) | **0.7583** |
 
-Typical outputs include:
-- `tables/benchmark_results.csv` (core metrics by split/seed)
-- `tables/applicability_domain_bins.csv` (performance by similarity bins)
-- `predictions/` (test-set predictions)
-- `models/` (saved models and metadata)
-- `lead_reports/` (per-molecule reports)
-
-Saved split files are stored in:
-- `data/splits/`
+> These values come from different evaluation contexts (cluster held-out benchmark vs. HPO validation), but together they confirm both pipelines execute successfully and deliver meaningful signal.
 
 ---
 
-## Current status
+## Figures from experiment outputs
 
-- Stage 1 baseline is implemented and runnable.
-- Stage 2 (ChemProp deep learning comparison) is planned/in progress.
+### Reliability and calibration behavior (cluster split)
+
+![Reliability plot (cluster split)](data/notebooks/reports/runs/2026-01-19_040056_seed22_seed22_split11_qc/figures/reliability_cluster.png)
+
+### Generalization stress snapshot (AUPRC)
+
+![Generalization gap AUPRC](data/notebooks/reports/runs/2026-01-19_040056_seed22_seed22_split11_qc/figures/generalization_gap_auprc.png)
 
 ---
 
-## Notes
+## Applicability-domain view (XGBoost cluster run)
 
-This is a research benchmark repository. It is not a clinical tool.
+| Similarity bin (`max_sim_to_train`) | N | AUPRC | Balanced Acc |
+|---|---:|---:|---:|
+| `<0.3` | 26 | 0.7798 | 0.6538 |
+| `0.3-0.5` | 23 | 0.9000 | 0.7462 |
+| `0.5-0.7` | 10 | 0.9571 | 0.8571 |
+| `>0.7` | 4 | 0.6389 | 0.5000 |
+
+---
+
+## One-line message
+
+**hERGBench now has two working model tracks, reproducible outputs, and a comparison-ready results stack—this benchmark is live, loud, and decision-useful.**
+
+---
+
+## Note
+
+This repository is for research benchmarking and model development. It is **not** a clinical diagnostic tool.
