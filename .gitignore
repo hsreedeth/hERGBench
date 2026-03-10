@@ -25,5 +25,6 @@ explanation_tutorial_notes.txt
 gitcomms.txt
 technical.md
 stage1_schematic.md
+hERGBench_Project_Abstract.tex
 
 # Can choose to include data_splits later (it is reproducibility-critical) for now data arw and processed are ignored.
