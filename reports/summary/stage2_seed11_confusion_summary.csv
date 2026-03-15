@@ -1,0 +1,4 @@
+split,path,n_test,prevalence,predicted_positive_rate,TN,FP,FN,TP,sensitivity,specificity,accuracy,balanced_accuracy
+random,reports/runs/f2026_03_11_213543_stage2_chemprop_random_seed11_torch42/predictions/test_preds_random_seed11.csv,64,0.6875,0.78125,9,11,5,39,0.8863636363636364,0.45,0.75,0.6681818181818182
+scaffold,reports/runs/f2026_03_11_235604_stage2_chemprop_scaffold_seed11_torch42/predictions/test_preds_scaffold_seed11.csv,63,0.6666666666666666,0.49206349206349204,14,7,18,24,0.5714285714285714,0.6666666666666666,0.6031746031746031,0.6190476190476191
+cluster,reports/runs/f2026_03_12_001321_stage2_chemprop_cluster_seed11_torch42/predictions/test_preds_cluster_seed11.csv,63,0.5714285714285714,0.9523809523809523,3,24,0,36,1.0,0.1111111111111111,0.6190476190476191,0.5555555555555556

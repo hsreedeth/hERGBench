@@ -14,22 +14,18 @@ def infer_split_type(run_dir: Path) -> str:
     raise RuntimeError(f"Cannot infer split_type from {name}")
 
 def load_test_metrics(run_dir: Path) -> dict:
-    inp = pd.read_csv(run_dir / "chemprop_input.csv")          # smiles,y,split
-    pred = pd.read_csv(run_dir / "predictions" / "preds.csv")  # smiles,y(pred)
-
-    assert len(inp) == len(pred)
-    if "smiles" in pred.columns:
-        # safest: assert order alignment
-        assert (inp["smiles"].values == pred["smiles"].values).all()
-
-    test = inp["split"].eq("test").values
-    y_true = inp.loc[test, "y"].astype(int)
-    y_score = pred.loc[test, "y"].astype(float)
-
+    bench = pd.read_csv(run_dir / "tables" / "benchmark_results.csv")
+    if len(bench) != 1:
+        raise RuntimeError(f"Expected 1-row benchmark_results.csv in {run_dir}")
+    row = bench.iloc[0]
     return {
-        "n_test": int(test.sum()),
-        "auroc": float(roc_auc_score(y_true, y_score)),
-        "auprc": float(average_precision_score(y_true, y_score)),
+        "n_test": None,  # optional; can be recovered from test_preds if needed
+        "threshold": float(row["threshold"]),
+        "auroc": float(row["auroc"]),
+        "auprc": float(row["auprc"]),
+        "f1": float(row["f1"]),
+        "balanced_acc": float(row["balanced_acc"]),
+        "brier": float(row["brier"]),
     }
 
 rows = []

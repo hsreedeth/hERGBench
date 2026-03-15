@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+from hergbench.evaluation.stage2_postprocess import postprocess_stage2_run
 import hashlib
 import json
 from dataclasses import asdict
@@ -11,6 +11,16 @@ import yaml
 
 from hergbench.data.split_apply import apply_split_membership
 from hergbench.chemprop_runner import ChemPropTrainConfig, chemprop_train, chemprop_predict
+
+def infer_split_type(membership_path: Path) -> str:
+    stem = membership_path.stem.lower()
+    if "random" in stem:
+        return "random"
+    if "scaffold" in stem:
+        return "scaffold"
+    if "cluster" in stem:
+        return "cluster"
+    return stem
 
 
 def sha256_file(path: Path) -> str:
@@ -24,7 +34,7 @@ def sha256_file(path: Path) -> str:
 def main(config_path: str) -> None:
     cfg = yaml.safe_load(Path(config_path).read_text())
 
-    # Guard: force CPU to avoid MPS op gaps (e.g., scatter_reduce on Apple GPUs).
+    # this is a guard step. forces CPU to avoid MPS op gaps (e.g., scatter_reduce on Apple GPUs more reading reqd. the following is tested).
     cfg.setdefault("chemprop", {})
     if str(cfg["chemprop"].get("accelerator", "")).lower() != "cpu" or str(cfg["chemprop"].get("devices", "")) != "1":
         print("[stage2_pipeline] Forcing ChemProp to CPU (accelerator=cpu, devices=1).")
@@ -59,17 +69,22 @@ def main(config_path: str) -> None:
 
     df2 = apply_split_membership(df, membership_path, join_key=join_key, split_col=cfg["splits"]["split_col"])
 
-    # Write chemprop input (single file with split column)
+    # Save full aligned input for downstream audit / postprocessing
+    keep_cols = [c for c in ["mol_id", smiles_col, target_col, "split"] if c in df2.columns]
+    full_input = df2[keep_cols].copy().rename(columns={smiles_col: "smiles", target_col: "y"})
+    full_input.to_csv(run_dir / "chemprop_input_full.csv", index=False)
+
+    # Canonical slim ChemProp file
     chemprop_input = run_dir / "chemprop_input.csv"
-    df2[[smiles_col, target_col, "split"]].to_csv(chemprop_input, index=False)
+    full_input[["smiles", "y", "split"]].to_csv(chemprop_input, index=False)
 
     # Train
     model_dir = run_dir / "models" / "chemprop_dmnn"
     train_cfg = ChemPropTrainConfig(
         data_path=chemprop_input,
         output_dir=model_dir,
-        smiles_col=smiles_col,
-        target_col=target_col,
+        smiles_col="smiles",
+        target_col="y",
         task_type=cfg["chemprop"]["task_type"],
         metrics=tuple(cfg["chemprop"]["metrics"]),
         tracking_metric=cfg["chemprop"]["tracking_metric"],
@@ -91,25 +106,50 @@ def main(config_path: str) -> None:
     )
     chemprop_train(train_cfg)
 
-    # Predict (write once; later filter by split)
+    # Predict
     pred_path = run_dir / "predictions" / "preds.csv"
     chemprop_predict(
         model_dir=model_dir,
         data_path=chemprop_input,
-        smiles_col=smiles_col,
+        smiles_col="smiles",
         out_path=pred_path,
         accelerator=str(cfg["chemprop"]["accelerator"]),
         devices=str(cfg["chemprop"]["devices"]),
     )
 
+    split_type = infer_split_type(membership_path)
+    seed = 11  # for current frozen split-membership runs
+
+    cal_cfg = cfg.get("calibration", {})
+    eval_cfg = cfg.get("evaluation", {})
+
+    postprocess_stage2_run(
+        run_dir=run_dir,
+        split_type=split_type,
+        seed=seed,
+        calibration_method=cal_cfg.get("method", "platt"),
+        threshold_metric=cal_cfg.get("threshold_metric", "youden"),
+        ad_bins=[float(x) for x in eval_cfg.get("ad_bins", [0.3, 0.5, 0.7])],
+        fp_radius=int(eval_cfg.get("fp_radius", 2)),
+        fp_n_bits=int(eval_cfg.get("fp_n_bits", 2048)),
+        bootstrap_B=int(eval_cfg.get("bootstrap_B", 2000)),
+        reliability_bins=int(cal_cfg.get("n_bins", 10)),
+    )
+
     # Write provenance bundle
     meta = {
-        "stage": 2,
-        "dataset_path": str(data_path),
-        "dataset_sha256": data_sha,
-        "membership_path": str(membership_path),
-        "train_config": asdict(train_cfg),
-    }
+    "stage": 2,
+    "split_type": split_type,
+    "dataset_path": str(data_path),
+    "dataset_sha256": data_sha,
+    "membership_path": str(membership_path),
+    "train_config": asdict(train_cfg),
+    "postprocess": {
+        "calibration_method": cal_cfg.get("method", "platt"),
+        "threshold_metric": cal_cfg.get("threshold_metric", "youden"),
+        "ad_bins": eval_cfg.get("ad_bins", [0.3, 0.5, 0.7]),
+    },
+}
     (run_dir / "run_metadata.json").write_text(json.dumps(meta, indent=2, default=str))
 
     print(f"[OK] Stage 2 run created: {run_dir}")
