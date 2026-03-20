@@ -129,3 +129,9 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+# python src/check_stage2.py \
+#   --random reports/runs/f2026_03_11_213543_stage2_chemprop_random_seed11_torch42 \
+#   --scaffold reports/runs/f2026_03_11_235604_stage2_chemprop_scaffold_seed11_torch42 \
+#   --cluster reports/runs/f2026_03_12_001321_stage2_chemprop_cluster_seed11_torch42 \
+#   --out reports/summary/stage2_seed11_confusion_summary.csv
