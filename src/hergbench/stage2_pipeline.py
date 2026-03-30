@@ -2,6 +2,7 @@ from __future__ import annotations
 from hergbench.evaluation.stage2_postprocess import postprocess_stage2_run
 import hashlib
 import json
+import os
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -31,15 +32,47 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def configure_runtime_device(cfg: dict) -> None:
+    chemprop_cfg = cfg.setdefault("chemprop", {})
+    requested_accelerator = str(chemprop_cfg.get("accelerator", "cpu")).strip().lower() or "cpu"
+    requested_devices = str(chemprop_cfg.get("devices", "1")).strip() or "1"
+    allow_gpu = os.getenv("HERGBENCH_ALLOW_GPU", "0") == "1"
+    gpu_requested = requested_accelerator in {"cuda", "gpu"}
+
+    if gpu_requested:
+        if not allow_gpu:
+            raise RuntimeError(
+                "GPU execution was requested in the config, but HERGBENCH_ALLOW_GPU=1 is not set. "
+                "Set HERGBENCH_ALLOW_GPU=1 to allow explicit CUDA runs."
+            )
+        try:
+            import torch
+        except ImportError as exc:
+            raise RuntimeError(
+                "GPU execution was requested, but torch is not installed in this environment."
+            ) from exc
+        if not torch.cuda.is_available() or torch.cuda.device_count() < 1:
+            raise RuntimeError(
+                "GPU execution was requested, but torch.cuda reports no available CUDA devices."
+            )
+
+        chemprop_cfg["accelerator"] = "cuda"
+        chemprop_cfg["devices"] = requested_devices
+        print(
+            f"[stage2_pipeline] Using GPU execution (accelerator=cuda, devices={requested_devices})."
+        )
+        return
+
+    if requested_accelerator != "cpu" or requested_devices != "1":
+        print("[stage2_pipeline] Forcing ChemProp to CPU (accelerator=cpu, devices=1).")
+    chemprop_cfg["accelerator"] = "cpu"
+    chemprop_cfg["devices"] = "1"
+
+
 def main(config_path: str) -> None:
     cfg = yaml.safe_load(Path(config_path).read_text())
 
-    # this is a guard step. forces CPU to avoid MPS op gaps (e.g., scatter_reduce on Apple GPUs more reading reqd. the following is tested).
-    cfg.setdefault("chemprop", {})
-    if str(cfg["chemprop"].get("accelerator", "")).lower() != "cpu" or str(cfg["chemprop"].get("devices", "")) != "1":
-        print("[stage2_pipeline] Forcing ChemProp to CPU (accelerator=cpu, devices=1).")
-    cfg["chemprop"]["accelerator"] = "cpu"
-    cfg["chemprop"]["devices"] = "1"
+    configure_runtime_device(cfg)
 
     data_path = Path(cfg["data"]["path"])
     smiles_col = cfg["data"]["smiles_col"]

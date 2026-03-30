@@ -44,14 +44,16 @@ class RawProbCalibrator:
 
     def predict(self, p_raw: np.ndarray) -> np.ndarray:
         p_raw = np.asarray(p_raw, dtype=float)
+
         if self.method == "none":
             out = p_raw
-        if self.method == "isotonic":
+        elif self.method == "isotonic":
             out = self.fitted.transform(p_raw)
         elif self.method == "sigmoid":
             out = self.fitted.predict_proba(p_raw.reshape(-1, 1))[:, 1]
         else:
             raise ValueError(f"Unknown calibration method: {self.method}")
+
         return np.clip(out, 0.0, 1.0)
 
 
