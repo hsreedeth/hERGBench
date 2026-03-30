@@ -1,0 +1,5 @@
+hERGBench Stage 2 cluster none multitorch bundle.
+Split membership: cluster_seed11
+Calibration method: none
+Execution profile: Runpod RTX 4090 workflow
+Run manifest: reports/summary/runpod_4090_cluster_none_multitorch_runs.csv
