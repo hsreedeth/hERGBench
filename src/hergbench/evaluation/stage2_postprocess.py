@@ -28,6 +28,8 @@ from rdkit import Chem
 
 def _normalize_calibration_method(method: str) -> str:
     method = str(method).strip().lower()
+    if method in {"none", "identity", "raw"}:
+        return "none"
     if method in {"platt", "sigmoid", "logistic"}:
         return "sigmoid"
     if method == "isotonic":
@@ -42,6 +44,8 @@ class RawProbCalibrator:
 
     def predict(self, p_raw: np.ndarray) -> np.ndarray:
         p_raw = np.asarray(p_raw, dtype=float)
+        if self.method == "none":
+            out = p_raw
         if self.method == "isotonic":
             out = self.fitted.transform(p_raw)
         elif self.method == "sigmoid":
@@ -56,6 +60,8 @@ def fit_calibrator(y_val: np.ndarray, p_val_raw: np.ndarray, method: str) -> Raw
     y_val = np.asarray(y_val).astype(int)
     p_val_raw = np.asarray(p_val_raw, dtype=float)
 
+    if method == "none":
+        return RawProbCalibrator(method = "none", fitted=None)
     if method == "isotonic":
         model = IsotonicRegression(out_of_bounds="clip")
         model.fit(p_val_raw, y_val)

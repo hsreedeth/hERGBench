@@ -36,10 +36,16 @@ chemprop:
   accelerator: cpu
   devices: 1
 
+# calibration:
+#   enabled: true
+#   method: platt
+#   eps: 1.0e-6
+
 calibration:
   enabled: true
-  method: platt
-  eps: 1.0e-6
+  method: none
+  threshold_metric: youden
+  n_bins: 10
 
 evaluation:
   ad_bins: [0.3, 0.5, 0.7]
