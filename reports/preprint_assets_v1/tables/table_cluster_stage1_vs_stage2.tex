@@ -1,0 +1,8 @@
+\begin{tabular}{llrrllllllllll}
+\toprule
+model & split_type & split_seed & n_runs & calibration_method & auroc & auprc & f1 & balanced_acc & brier & threshold & predicted_positive_rate & test_prevalence & notes \\
+\midrule
+Stage 1 XGBoost ECFP4 & cluster & 11 & 1 & sigmoid & 0.772 & 0.838 & 0.732 & 0.620 & 0.215 & 0.510 & NA & 0.571 & Frozen single benchmark from Stage 1 signoff bundle; predicted_positive_rate not exposed in the frozen Stage 1 bundle. \\
+Stage 2 ChemProp D-MPNN & cluster & 11 & 5 & none & 0.780 $\pm$ 0.010 & 0.825 $\pm$ 0.007 & 0.761 $\pm$ 0.109 & 0.710 $\pm$ 0.022 & 0.244 $\pm$ 0.007 & 0.622 $\pm$ 0.113 & 0.648 $\pm$ 0.212 & 0.571 & Mean +/- SD across torch seeds on one fixed cluster_seed11 split with calibration.method=none. \\
+\bottomrule
+\end{tabular}

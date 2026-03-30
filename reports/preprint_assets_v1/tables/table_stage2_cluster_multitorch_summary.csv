@@ -1,0 +1,2 @@
+split_type,split_seed,calibration_method,n_runs,auroc_mean,auroc_std,auprc_mean,auprc_std,f1_mean,f1_std,balanced_acc_mean,balanced_acc_std,brier_mean,brier_std,threshold_mean,threshold_std,predicted_positive_rate_mean,predicted_positive_rate_std,test_prevalence
+cluster,11,none,5,0.7804526748971193,0.00955738614197,0.8247066597180801,0.0068396305236989,0.7608402587910451,0.1091969936474692,0.7101851851851851,0.0221061784931728,0.2435485872211906,0.0073967457728483,0.6220000000000001,0.1125610945220416,0.6476190476190476,0.2121884433708065,0.5714285714285714
