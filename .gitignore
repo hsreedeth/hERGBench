@@ -11,8 +11,8 @@ __pycache__/
 *.conda-lock
 
 # data related.
-data/raw
-data/processed
+# data/raw
+# data/processed
 reports/runs
 reports/lead_reports
 
