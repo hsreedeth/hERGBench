@@ -125,8 +125,11 @@ echo "[setup] Step 4d: PyTDC==0.4.1 (installed with --no-deps to avoid rdkit-pyp
 # and then manually add the packages it actually needs at runtime.
 "${PIP}" install --quiet --no-deps "PyTDC==0.4.1"
 
-# PyTDC runtime deps (excluding rdkit which is already installed):
+# PyTDC runtime deps (excluding rdkit which is already installed).
+# setuptools must be explicit — pkg_resources (used by tdc/__init__) lives inside it
+# and is not guaranteed present in a fresh venv on newer pip versions.
 "${PIP}" install --quiet \
+    "setuptools>=68" \
     "requests" \
     "tqdm" \
     "fuzzywuzzy" \
