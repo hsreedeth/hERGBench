@@ -964,10 +964,24 @@ def write_lead_report(
     if cf_summary and counterfactuals:
         expected = str(cf_summary.get("final_tier", ""))
         actual = display["tier"]
+        tier_order = {
+            "flip": 1,
+            "risk_reduction": 2,
+            "weak_improvement": 3,
+            "diagnostic_close_edits": 4,
+        }
 
-        # Allow common aliasing when the orchestration layer calls it "dataset_fallback"
-        # but rows are tagged "dataset_analogue".
-        alias_ok = (expected == "dataset_fallback" and actual == "dataset_analogue")
+        # Allow known aliases and mixed-tier sets where the summary tier is among the row tiers.
+        # TODO: harmonize tier naming — tier_specs uses "weak_reduction" but TIER_LABEL uses "weak_improvement"
+        row_tiers = {str(cf.get("tier", "")) for cf in counterfactuals}
+        alias_ok = (
+            (expected == "dataset_fallback" and actual == "dataset_analogue")
+            or (actual == "mixed" and expected in row_tiers)
+            or (actual == "mixed" and any(
+                expected in (t, t.replace("reduction", "improvement"), t.replace("improvement", "reduction"))
+                for t in row_tiers
+            ))
+        )
 
         if expected and expected not in ("none", "unknown") and actual and (expected != actual) and (not alias_ok):
             raise ValueError(
