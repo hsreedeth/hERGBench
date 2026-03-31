@@ -34,6 +34,23 @@ echo ""
 cd "${REPO_ROOT}"
 
 # ---------------------------------------------------------------------------
+# 0b. System libraries needed by RDKit drawing / exmol / synspace
+# ---------------------------------------------------------------------------
+if command -v apt-get >/dev/null 2>&1; then
+    echo "[setup] Installing required system libraries for RDKit drawing..."
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -y >/dev/null
+    apt-get install -y --no-install-recommends \
+        libxrender1 \
+        libxext6 \
+        libsm6 \
+        libx11-6 \
+        libglib2.0-0 >/dev/null
+else
+    echo "[setup] apt-get not available; assuming required system libraries are already present."
+fi
+
+# ---------------------------------------------------------------------------
 # 1. Python sanity check (need 3.11+)
 # ---------------------------------------------------------------------------
 _py_bin=""
@@ -157,7 +174,7 @@ else
 fi
 
 echo "[setup] Step 4e: typer (CLI framework)..."
-"${PIP}" install --quiet "typer[all]>=0.12" "pyyaml>=6.0"
+"${PIP}" install --quiet "typer>=0.12" "pyyaml>=6.0"
 
 echo "[setup] Step 4f: exmol + selfies (counterfactual generation)..."
 # selfies must be >=2.1; exmol will pull the rest (synspace, skunk, openai, etc.)
