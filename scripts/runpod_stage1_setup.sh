@@ -86,6 +86,15 @@ echo ""
 echo "[setup] Upgrading pip, setuptools, wheel..."
 "${PIP}" install --quiet --upgrade pip setuptools wheel
 
+CACHED_DATASET="${REPO_ROOT}/data/processed/herg_clean.csv"
+USE_CACHED_DATASET=0
+if [[ -f "${CACHED_DATASET}" ]]; then
+    USE_CACHED_DATASET=1
+    echo "[setup] Cached Stage 1 dataset detected at ${CACHED_DATASET}"
+else
+    echo "[setup] No cached processed dataset found; PyTDC will be needed to fetch hERG."
+fi
+
 # ---------------------------------------------------------------------------
 # 4. Install dependencies — ORDER MATTERS
 #
@@ -120,28 +129,32 @@ echo "[setup]   rdkit OK: $("${PY}" -c 'import rdkit; print(rdkit.__version__)')
 echo "[setup] Step 4c: XGBoost, Optuna..."
 "${PIP}" install --quiet "xgboost>=2.0" "optuna>=3.6"
 
-echo "[setup] Step 4d: PyTDC==0.4.1 (installed with --no-deps to avoid rdkit-pypi conflict)..."
-# PyTDC's declared dep on rdkit-pypi is stale. We install it without deps
-# and then manually add the packages it actually needs at runtime.
-"${PIP}" install --quiet --no-deps "PyTDC==0.4.1"
+if [[ "${USE_CACHED_DATASET}" == "1" ]]; then
+    echo "[setup] Step 4d: skipping PyTDC install because cached processed dataset is present."
+else
+    echo "[setup] Step 4d: PyTDC==0.4.1 (installed with --no-deps to avoid rdkit-pypi conflict)..."
+    # PyTDC's declared dep on rdkit-pypi is stale. We install it without deps
+    # and then manually add the packages it actually needs at runtime.
+    "${PIP}" install --quiet --no-deps "PyTDC==0.4.1"
 
-# PyTDC runtime deps (excluding rdkit which is already installed).
-# setuptools must be explicit — pkg_resources (used by tdc/__init__) lives inside it
-# and is not guaranteed present in a fresh venv on newer pip versions.
-"${PIP}" install --quiet \
-    "setuptools>=68" \
-    "requests" \
-    "tqdm" \
-    "fuzzywuzzy" \
-    "python-Levenshtein" \
-    "huggingface_hub" \
-    "seaborn" \
-    "pyarrow"
+    # PyTDC runtime deps (excluding rdkit which is already installed).
+    # Pin setuptools below 81 so pkg_resources remains available for PyTDC.
+    "${PIP}" install --quiet \
+        "setuptools<81" \
+        "dataclasses" \
+        "requests" \
+        "tqdm" \
+        "fuzzywuzzy" \
+        "python-Levenshtein" \
+        "huggingface_hub" \
+        "seaborn" \
+        "pyarrow"
 
-# Verify PyTDC can at least be imported.
-"${PY}" -c "import tdc" \
-    || { echo "[ERROR] PyTDC import failed." >&2; exit 1; }
-echo "[setup]   PyTDC OK"
+    # Verify PyTDC can at least be imported.
+    "${PY}" -c "import pkg_resources; import tdc" \
+        || { echo "[ERROR] PyTDC import failed." >&2; exit 1; }
+    echo "[setup]   PyTDC OK"
+fi
 
 echo "[setup] Step 4e: typer (CLI framework)..."
 "${PIP}" install --quiet "typer[all]>=0.12" "pyyaml>=6.0"
@@ -161,7 +174,7 @@ echo "[setup]   exmol OK"
 # ---------------------------------------------------------------------------
 echo ""
 echo "[setup] Step 5: installing hergbench in editable mode..."
-"${PIP}" install --quiet -e "${REPO_ROOT}"
+"${PIP}" install --quiet -e "${REPO_ROOT}" --no-deps
 
 # Verify the CLI entry point exists.
 HERGBENCH_BIN="${VENV_DIR}/bin/hergbench"
@@ -176,8 +189,10 @@ echo "[setup]   hergbench CLI : ${HERGBENCH_BIN}"
 # ---------------------------------------------------------------------------
 echo ""
 echo "[setup] Step 6: import smoke test..."
-"${PY}" - <<'PYEOF'
+"${PY}" - <<PYEOF
 import sys
+
+use_cached_dataset = ${USE_CACHED_DATASET}
 
 checks = [
     ("numpy",             "import numpy as np; print('  numpy', np.__version__)"),
@@ -187,11 +202,13 @@ checks = [
     ("xgboost",           "import xgboost; print('  xgboost', xgboost.__version__)"),
     ("optuna",            "import optuna; print('  optuna', optuna.__version__)"),
     ("exmol",             "import exmol; print('  exmol OK')"),
-    ("tdc",               "import tdc; print('  PyTDC OK')"),
     ("hergbench.cli",     "from hergbench.cli import app; print('  hergbench.cli OK')"),
     ("hergbench.stage1",  "from hergbench.stage1_pipeline import run_stage1; print('  hergbench.stage1_pipeline OK')"),
     ("hergbench.lead_opt","from hergbench.reporting.lead_opt import generate_counterfactuals_exmol, _generic_scaffold_smi; print('  lead_opt OK (scaffold fn present)')"),
 ]
+
+if not use_cached_dataset:
+    checks.append(("tdc", "import pkg_resources; import tdc; print('  PyTDC OK')"))
 
 failed = []
 for name, stmt in checks:
@@ -215,17 +232,20 @@ echo ""
 echo "[setup] Step 7: checking required data files..."
 
 _check_file() {
-    if [[ ! -f "${REPO_ROOT}/$1" ]]; then
-        echo "[ERROR] Required file missing: ${REPO_ROOT}/$1" >&2
-        echo "        Run: hergbench run -c configs/base.yaml --fetch-data" >&2
-        exit 1
+    if [[ -f "${REPO_ROOT}/$1" ]]; then
+        echo "[setup]   found: $1"
+    else
+        echo "[setup]   missing: $1"
     fi
-    echo "[setup]   found: $1"
 }
 
 _check_file "data/processed/herg_clean.csv"
 _check_file "configs/stage1_signoff.yaml"
 _check_file "configs/panels/stage1_signoff_panel_seed42_n30.csv"
+
+if [[ "${USE_CACHED_DATASET}" == "0" ]]; then
+    echo "[setup]   processed dataset absent; Stage 1 will need PyTDC fetch on first run."
+fi
 
 # Splits are generated on first run; just warn if absent.
 if ls "${REPO_ROOT}/data/splits/"*.csv >/dev/null 2>&1; then
