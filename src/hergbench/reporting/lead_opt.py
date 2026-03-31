@@ -12,6 +12,7 @@ import inspect
 from rdkit import Chem, DataStructs
 from rdkit.Chem import Crippen, Draw, QED
 from rdkit.Chem.FilterCatalog import FilterCatalog, FilterCatalogParams
+from rdkit.Chem.Scaffolds import MurckoScaffold
 
 from hergbench.features.fingerprints import FingerprintConfig, mol_to_ecfp_bits
 from hergbench.reporting.sascorer import calculate_sa_score
@@ -103,6 +104,16 @@ def has_structural_alerts(mol: Chem.Mol) -> bool:
     return entry is not None
 
 
+def _generic_scaffold_smi(mol: Chem.Mol) -> Optional[str]:
+    """Generic Murcko scaffold as canonical SMILES (ring topology only, no atom types, no side chains)."""
+    try:
+        core = MurckoScaffold.GetScaffoldForMol(mol)
+        generic = MurckoScaffold.MakeScaffoldGeneric(core)
+        return Chem.MolToSmiles(generic)
+    except Exception:
+        return None
+
+
 def mol_props(mol: Chem.Mol, fpscores_path: Optional[Path] = None, cache_dir: Optional[Path] = None) -> Dict[str, float]:
     return {
         "logp": float(Crippen.MolLogP(mol)),
@@ -161,6 +172,8 @@ def dataset_analogues(
     if base_std_smi is None or base_std_mol is None:
         return []
 
+    base_scaffold_smi = _generic_scaffold_smi(base_std_mol)
+
     base_fp_std = mol_to_ecfp_bits(base_std_mol, fp_cfg) if fp_cfg is not None else base_fp
     base_fp_use = base_fp_std if base_fp_std is not None else base_fp
     base_p_use = base_p
@@ -181,6 +194,12 @@ def dataset_analogues(
         # Avoid mixing identities: only keep cases where standardize/neutralize does not change the dataset row identity.
         if std_smi != raw_smi:
             continue
+
+        # Prefer same-scaffold analogues
+        if base_scaffold_smi is not None:
+            cand_scaffold = _generic_scaffold_smi(mol)
+            if cand_scaffold != base_scaffold_smi:
+                continue
 
         sim = float(DataStructs.TanimotoSimilarity(base_fp_use, fp))
 
@@ -216,10 +235,68 @@ def dataset_analogues(
             }
         )
 
+    # If scaffold matching killed everything, rerun without scaffold constraint
+    if not entries and base_scaffold_smi is not None:
+        for raw_smi, fp, p in zip(dataset_smiles, dataset_fps, dataset_probs):
+            std_smi, mol = _std_for_scoring(raw_smi)
+            if std_smi is None or mol is None:
+                continue
+            if std_smi == base_std_smi:
+                continue
+            if std_smi != raw_smi:
+                continue
+            sim = float(DataStructs.TanimotoSimilarity(base_fp_use, fp))
+            props = mol_props(mol, cache_dir=fpscores_cache_dir)
+            sa_val = float(props["sascore"])
+            alert = has_structural_alerts(mol) if use_pains else False
+            if not np.isfinite(sa_val):
+                sa_val = float("nan")
+            actionable = (not alert) and (not np.isnan(sa_val)) and (sa_val <= sa_cutoff) and ((base_p - float(p)) > 0)
+            entries.append({
+                "raw_smiles": raw_smi, "smiles": std_smi, "similarity": sim,
+                "p": float(p), "delta_p": base_p_use - float(p),
+                "logp": float(props["logp"]), "qed": float(props["qed"]),
+                "sascore": sa_val, "sa_status": "ok" if np.isfinite(sa_val) else "failed",
+                "actionable": actionable, "alert": alert,
+                "tier": "dataset_analogue", "tier_label": "Dataset analogue",
+                "relaxation": "none", "relaxation_desc": "dataset fallback (no scaffold match)",
+                "sa_max_used": sa_cutoff, "pains_used": use_pains,
+            })
+
     primary = [e for e in entries if e["similarity"] >= min_sim]
     pool = primary if primary else entries
     pool.sort(key=lambda r: (r["p"], -r["similarity"], r["smiles"]))
     return pool[:top_k]
+
+
+def _diverse_topk(
+    rows: List[Dict[str, Any]],
+    k: int,
+    fp_cfg: FingerprintConfig,
+    div_penalty: float = 0.3,
+) -> List[Dict[str, Any]]:
+    """Greedy diverse selection: pick best candidate, penalize remaining by similarity to selected."""
+    if len(rows) <= k:
+        return rows
+    scored = []
+    for r in rows:
+        scored.append({"row": r, "score": r["delta_p"] + r["similarity"]})
+    selected: List[Dict[str, Any]] = []
+    while len(selected) < k and scored:
+        scored.sort(key=lambda x: x["score"], reverse=True)
+        pick = scored.pop(0)
+        selected.append(pick["row"])
+        pick_mol = Chem.MolFromSmiles(pick["row"]["smiles"])
+        if pick_mol is None:
+            continue
+        pick_fp = mol_to_ecfp_bits(pick_mol, fp_cfg)
+        for s in scored:
+            cand_mol = Chem.MolFromSmiles(s["row"]["smiles"])
+            if cand_mol is None:
+                continue
+            internal_sim = float(DataStructs.TanimotoSimilarity(pick_fp, mol_to_ecfp_bits(cand_mol, fp_cfg)))
+            s["score"] -= div_penalty * internal_sim
+    return selected
 
 
 def generate_counterfactuals_exmol(
@@ -276,7 +353,7 @@ def generate_counterfactuals_exmol(
     # Production guardrail: enforce a large budget only when user did not explicitly override with search_nmols.
     # This keeps real runs robust, but allows small debug/pytest runs to request small budgets.
     if search_nmols is None:
-        sample_budget = min(max(sample_budget, 1500), 2000)
+        sample_budget = min(max(sample_budget, 3000), 5000)
     else:
         # Still enforce basic sanity bounds for explicit overrides
         sample_budget = max(sample_budget, 1)
@@ -284,6 +361,7 @@ def generate_counterfactuals_exmol(
 
     base_props = mol_props(mol_base, cache_dir=fpscores_cache_dir)
     fp_base = mol_to_ecfp_bits(mol_base, fp_cfg)
+    base_scaffold_smi = _generic_scaffold_smi(mol_base)
 
     # Tier specs encode the success definition; always evaluated on the full sampled pool.
     tier_specs = [
@@ -489,6 +567,23 @@ def generate_counterfactuals_exmol(
             sample_err,
         )
 
+    # Scaffold preservation diagnostic
+    scaffold_preserved = 0
+    scaffold_total = 0
+    for ex in examples:
+        smi = getattr(ex, "smiles", None)
+        if smi is None and isinstance(ex, dict):
+            smi = ex.get("smiles")
+        if not smi:
+            continue
+        _, _mol = _std_for_scoring(smi)
+        if _mol is None:
+            continue
+        scaffold_total += 1
+        if _generic_scaffold_smi(_mol) == base_scaffold_smi:
+            scaffold_preserved += 1
+    scaffold_preservation_rate = scaffold_preserved / scaffold_total if scaffold_total > 0 else 0.0
+
     if sample_err and sample_count == 0:
         diag = {
             "sampled": 0,
@@ -547,6 +642,7 @@ def generate_counterfactuals_exmol(
             "sampled": sample_count,
             "invalid": 0,
             "duplicate": 0,
+            "scaffold_filtered": 0,
             "similarity_filtered": 0,
             "prob_filtered": 0,
             "delta_filtered": 0,
@@ -594,6 +690,13 @@ def generate_counterfactuals_exmol(
             if sim < min_sim:
                 counts["similarity_filtered"] += 1
                 continue
+
+            # Scaffold preservation: reject candidates that change ring topology
+            if base_scaffold_smi is not None:
+                cand_scaffold = _generic_scaffold_smi(mol)
+                if cand_scaffold != base_scaffold_smi:
+                    counts["scaffold_filtered"] += 1
+                    continue
 
             p = float(prob_cached(std_smi))
             delta_p = p_base - p
@@ -760,9 +863,12 @@ def generate_counterfactuals_exmol(
 
 
 
-    # rank: high risk drop then high similarity to prefer meaningful and close suggestions
-    final_rows.sort(key=lambda r: (r["delta_p"], r["similarity"]), reverse=True)
-    final_rows = final_rows[:nmols]
+    # rank: diverse top-k for Tier 1–3; similarity sort for Tier 4 diagnostic
+    if final_tier != "diagnostic_close_edits":
+        final_rows = _diverse_topk(final_rows, nmols, fp_cfg, div_penalty=0.3)
+    else:
+        final_rows.sort(key=lambda r: r["similarity"], reverse=True)
+        final_rows = final_rows[:nmols]
 
     diag = {
         "sampled": sample_count,
@@ -777,6 +883,9 @@ def generate_counterfactuals_exmol(
         "relaxation_used": relaxation_used,
         "final_count": len(final_rows),
         "scarcity": len(final_rows) == 0,
+        "scaffold_preservation_rate": scaffold_preservation_rate,
+        "scaffold_preserved_count": scaffold_preserved,
+        "scaffold_total_count": scaffold_total,
     }
     return final_rows, diag
 
@@ -910,6 +1019,9 @@ def write_lead_report(
         scarcity = bool(cf_summary.get("scarcity", False))
         fallback_used = bool(dataset_analogues)
         md.append(f"- ExMol requested: {sample_budget} | drawn: {sampled}\n")
+        if cf_summary.get("scaffold_preservation_rate") is not None:
+            spr = cf_summary["scaffold_preservation_rate"]
+            md.append(f"- Scaffold preservation rate: {spr:.1%} ({cf_summary.get('scaffold_preserved_count', 0)}/{cf_summary.get('scaffold_total_count', 0)})\n")
         md.append(f"- Generated tier (Tier 1–4): {display['tier_label'] if display['tier'] != 'none' else 'None'}\n")
         md.append(f"- Relaxation used: {bool(display['relaxation'] != 'none' and display['relaxation'] != 'mixed')} (applied: {display['relaxation']})\n")
         md.append(f"- Generated survivors (Tier 1–4): {len(counterfactuals)}\n")
@@ -922,7 +1034,7 @@ def write_lead_report(
             winner_relax = display["relaxation"] if display["relaxation"] else "none"
             md.append("\n### Filter attrition by tier (baseline + final relaxation)\n")
             md.append("<table>\n")
-            md.append("<tr><th>Tier</th><th>Relaxation</th><th>Sampled</th><th>Kept</th><th>Invalid</th><th>Duplicate</th><th>Similarity</th><th>Prob</th><th>Δp</th><th>SA</th><th>ΔLogP</th><th>QED</th><th>Alerts</th></tr>\n")
+            md.append("<tr><th>Tier</th><th>Relaxation</th><th>Sampled</th><th>Kept</th><th>Invalid</th><th>Duplicate</th><th>Scaffold</th><th>Similarity</th><th>Prob</th><th>Δp</th><th>SA</th><th>ΔLogP</th><th>QED</th><th>Alerts</th></tr>\n")
             for a in attempts:
                 if a.get("relaxation") not in ("none", winner_relax):
                     continue
@@ -931,6 +1043,7 @@ def write_lead_report(
                     f"<tr><td>{a.get('tier_label', a.get('tier'))}</td>"
                     f"<td>{a.get('relaxation', 'none')}</td>"
                     f"<td>{c.get('sampled', 0)}</td><td>{c.get('kept', 0)}</td><td>{c.get('invalid', 0)}</td><td>{c.get('duplicate', 0)}</td>"
+                    f"<td>{c.get('scaffold_filtered', 0)}</td>"
                     f"<td>{c.get('similarity_filtered', 0)}</td><td>{c.get('prob_filtered', 0)}</td><td>{c.get('delta_filtered', 0)}</td>"
                     f"<td>{c.get('sa_filtered', 0)}</td><td>{c.get('logp_filtered', 0)}</td><td>{c.get('qed_filtered', 0)}</td><td>{c.get('alert_filtered', 0)}</td></tr>\n"
                 )
