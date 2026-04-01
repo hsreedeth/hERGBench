@@ -1,0 +1,55 @@
+{
+  "source": "ChEMBL",
+  "target": "CHEMBL240 (KCNH2/hERG)",
+  "threshold_uM": 10.0,
+  "fetch_date": "2026-04-01",
+  "raw_count": 11959,
+  "chembl_version": "ChEMBL_36",
+  "quality_filtered": {
+    "raw_count": 11959,
+    "removed_validity_flag": 222,
+    "removed_null_value": 0,
+    "removed_null_smiles": 2,
+    "removed_no_pchembl": 0,
+    "after_quality": 11735
+  },
+  "binarized": {
+    "blockers": 8156,
+    "non_blockers": 3579,
+    "prevalence": 0.695
+  },
+  "duplicate_resolution": {
+    "compounds_before_dedup": 11735,
+    "compounds_single_measurement": 8110,
+    "compounds_multi_concordant": 1230,
+    "compounds_multi_ambiguous": 157,
+    "compounds_after_dedup": 9497
+  },
+  "tdc_overlap": {
+    "tdc_compounds": 635,
+    "overlap_removed": 134,
+    "overlap_rate": 0.211
+  },
+  "standardization": {
+    "before": 9363,
+    "failed": 0,
+    "collapsed": 80,
+    "after": 9283
+  },
+  "final_dataset": {
+    "n_compounds": 9283,
+    "n_blockers": 6502,
+    "n_non_blockers": 2781,
+    "prevalence": 0.7004
+  },
+  "split_validation": {
+    "cluster_gt07_bin": {
+      "seed_11": 142,
+      "seed_22": 136,
+      "seed_33": 145,
+      "seed_44": 154,
+      "seed_55": 150,
+      "mean": 145.4
+    }
+  }
+}

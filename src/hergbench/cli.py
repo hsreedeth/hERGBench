@@ -174,6 +174,52 @@ def stage1(
 
 
 @app.command()
+def curate_chembl(
+    output_dir: Path = typer.Option(
+        Path("data/chembl"),
+        "--output-dir",
+        help="Root directory for all ChEMBL outputs.",
+    ),
+    tdc_path: Path = typer.Option(
+        Path("data/processed/herg_clean.csv"),
+        "--tdc-path",
+        help="TDC clean dataset path for deduplication.",
+    ),
+    threshold: float = typer.Option(
+        10.0,
+        "--threshold",
+        help="Binarization threshold in μM (default 10 μM).",
+    ),
+    skip_fetch: bool = typer.Option(
+        False,
+        "--skip-fetch",
+        help="Skip API fetch and use cached raw CSV if present.",
+    ),
+) -> None:
+    """Curate ChEMBL hERG dataset (CHEMBL240) for benchmarking.
+
+    Fetches binding IC50/Ki data, applies quality filters, binarizes at the
+    given threshold, deduplicates against TDC, standardizes SMILES, and
+    generates 5-seed × 3-split-type split CSVs ready for the pipeline.
+    """
+    from hergbench.data.chembl_fetch import curate_chembl_herg, fetch_chembl_herg
+
+    if skip_fetch:
+        raw_path = Path(output_dir) / "raw" / "chembl_herg_raw.csv"
+        if not raw_path.exists():
+            raise typer.BadParameter(
+                f"--skip-fetch requested but raw cache not found at {raw_path}.",
+                param_hint="--skip-fetch",
+            )
+
+    curate_chembl_herg(
+        output_dir=Path(output_dir),
+        tdc_path=Path(tdc_path),
+        threshold_uM=threshold,
+    )
+
+
+@app.command()
 def build_panel(
     predictions_csv: Path = typer.Option(
         ...,
