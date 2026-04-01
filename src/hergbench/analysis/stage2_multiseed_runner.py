@@ -142,9 +142,12 @@ def _load_manifest(manifest_path: Path) -> dict[str, str]:
 def _append_manifest(manifest_path: Path, config_stem: str, run_dir: Path) -> None:
     row = pd.DataFrame([{"config_stem": config_stem, "run_dir": str(run_dir)}])
     if manifest_path.exists():
-        row.to_csv(manifest_path, mode="a", header=False, index=False)
+        existing = pd.read_csv(manifest_path)
+        existing = existing[existing["config_stem"].astype(str) != str(config_stem)]
+        out_df = pd.concat([existing, row], ignore_index=True)
     else:
-        row.to_csv(manifest_path, index=False)
+        out_df = row
+    out_df.to_csv(manifest_path, index=False)
 
 
 def _rebuild_manifest_from_runs(

@@ -42,7 +42,7 @@ from hergbench.analysis.stage2_multiseed_runner import run_stage2_multiseed
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-8s %(message)s", datefmt="%H:%M:%S")
 
-skip_existing = ${SKIP_EXISTING} == "1"
+skip_existing = "${SKIP_EXISTING}" == "1"
 
 raw = run_stage2_multiseed(
     dataset="tdc",

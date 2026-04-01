@@ -42,7 +42,7 @@ evaluation:
   - 0.7
   fp_radius: 2
   fp_n_bits: 2048
-  boostrap_B: 2000
+  bootstrap_B: 2000
 reporting:
   run_root: reports/runs
   save_preds: true

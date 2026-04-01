@@ -17,8 +17,12 @@ activate_stage2_venv "${REPO_ROOT}" || true
 
 echo "=== 02 Generate Stage 2 Configs ==="
 
+# Regenerate TDC configs from the current base template.
+echo "  Regenerating TDC configs..."
+python src/make_stage2_multiseed_configs.py
+
 # ChEMBL configs (3 splits × 5 seeds = 15 files)
-echo "  Generating ChEMBL configs..."
+echo "  Regenerating ChEMBL configs..."
 python src/make_chembl_stage2_configs.py
 
 CHEMBL_COUNT=$(ls configs/chembl_stage2_multiseed/*.yaml 2>/dev/null | wc -l | tr -d ' ')
@@ -28,12 +32,11 @@ if [[ "${CHEMBL_COUNT}" -ne 15 ]]; then
     exit 1
 fi
 
-# TDC configs — verify all 15 already exist
+# TDC configs — verify all 15 exist after regeneration
 TDC_COUNT=$(ls configs/stage2_multiseed/*.yaml 2>/dev/null | wc -l | tr -d ' ')
 echo "  TDC configs:    ${TDC_COUNT}/15"
 if [[ "${TDC_COUNT}" -ne 15 ]]; then
     echo "ERROR: expected 15 TDC configs in configs/stage2_multiseed/, found ${TDC_COUNT}." >&2
-    echo "       Re-run: python src/make_stage2_multiseed_configs.py" >&2
     exit 1
 fi
 
@@ -50,6 +53,18 @@ for config_dir in [Path("configs/stage2_multiseed"), Path("configs/chembl_stage2
         cfg["chemprop"]["devices"] = 1
         path.write_text(yaml.safe_dump(cfg, sort_keys=False))
         print(f"    GPU-ready: {path}")
+
+base_cfg = yaml.safe_load(Path("configs/stage2_chemprop.yaml").read_text())
+expected_cal = str(base_cfg.get("calibration", {}).get("method", "none")).lower()
+for config_dir in [Path("configs/stage2_multiseed"), Path("configs/chembl_stage2_multiseed")]:
+    for path in sorted(config_dir.glob("*.yaml")):
+        cfg = yaml.safe_load(path.read_text())
+        actual_cal = str(cfg.get("calibration", {}).get("method", "none")).lower()
+        if actual_cal != expected_cal:
+            raise SystemExit(
+                f"Calibration mismatch in {path}: expected {expected_cal}, found {actual_cal}"
+            )
+print(f"  Calibration method validated across all configs: {expected_cal}")
 PYEOF
 
 echo ""

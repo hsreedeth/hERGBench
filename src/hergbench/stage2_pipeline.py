@@ -3,6 +3,7 @@ from hergbench.evaluation.stage2_postprocess import postprocess_stage2_run
 import hashlib
 import json
 import os
+import re
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -151,7 +152,8 @@ def main(config_path: str) -> None:
     )
 
     split_type = infer_split_type(membership_path)
-    seed = 11  # for current frozen split-membership runs
+    _seed_match = re.search(r"seed(\d+)", membership_path.stem)
+    seed = int(_seed_match.group(1)) if _seed_match else int(cfg["chemprop"]["pytorch_seed"])
 
     cal_cfg = cfg.get("calibration", {})
     eval_cfg = cfg.get("evaluation", {})

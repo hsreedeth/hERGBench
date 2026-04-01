@@ -38,16 +38,10 @@ BASE = yaml.safe_load(_base_yaml)
 OUTDIR.mkdir(parents=True, exist_ok=True)
 
 written = 0
-skipped = 0
 
 for split in SPLIT_TYPES:
     for seed in SEEDS:
         out_path = OUTDIR / f"stage2_chemprop_chembl_{split}_seed{seed}_torch{TORCH_SEED}.yaml"
-
-        if out_path.exists():
-            # Idempotent: don't overwrite existing configs
-            skipped += 1
-            continue
 
         cfg = yaml.safe_load(_base_yaml)  # fresh copy each iteration
 
@@ -74,8 +68,6 @@ for split in SPLIT_TYPES:
 total = len(SPLIT_TYPES) * len(SEEDS)
 print(f"configs/chembl_stage2_multiseed/  ({total} total)")
 print(f"  written:  {written}")
-print(f"  skipped (already exist): {skipped}")
-
 # Sanity check
 actual = list(OUTDIR.glob("*.yaml"))
 print(f"  on disk:  {len(actual)}")

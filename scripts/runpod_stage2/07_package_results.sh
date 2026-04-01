@@ -62,11 +62,18 @@ for manifest_path in manifest_paths:
     if not manifest_path.exists():
         continue
     df = pd.read_csv(manifest_path)
-    for run_dir in df["run_dir"].astype(str).tolist():
-        run_dirs.append(run_dir)
+    if "config_stem" in df.columns:
+        latest_by_config = {}
+        for _, row in df.iterrows():
+            latest_by_config[str(row["config_stem"])] = str(row["run_dir"])
+        run_dirs.extend(latest_by_config.values())
+    else:
+        run_dirs.extend(df["run_dir"].astype(str).tolist())
 
-for run_dir in sorted(set(run_dirs)):
-    package_list.write_text(package_list.read_text() + f"{run_dir}\n")
+unique_run_dirs = sorted(set(run_dirs))
+existing = package_list.read_text()
+package_list.write_text(existing + "\n".join(unique_run_dirs) + "\n")
+for run_dir in unique_run_dirs:
     print(f"  including run dir: {run_dir}")
 PYEOF
 

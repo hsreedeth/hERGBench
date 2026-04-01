@@ -13,6 +13,40 @@ from typing import Optional
 import pandas as pd
 
 
+def _summarize_weighted_across_bins(
+    grp: pd.DataFrame,
+    metric_cols: list[str],
+) -> dict[str, float]:
+    """Return seed-level weighted summary stats across similarity bins.
+
+    For each seed, metrics are weighted by that seed's AD-bin counts ``n``.
+    The reported mean/std are then taken across seeds, preserving the intended
+    repeated-run variability while avoiding equal weighting of tiny and large
+    bins.
+    """
+    seed_rows = []
+    for seed, seed_grp in grp.groupby("seed", observed=True):
+        row: dict[str, float] = {"seed": seed}
+        weights = pd.to_numeric(seed_grp["n"], errors="coerce")
+        for metric in metric_cols:
+            vals = pd.to_numeric(seed_grp[metric], errors="coerce")
+            mask = vals.notna() & weights.notna() & (weights > 0)
+            if mask.any():
+                w = weights[mask]
+                row[metric] = float((vals[mask] * w).sum() / w.sum())
+            else:
+                row[metric] = float("nan")
+        seed_rows.append(row)
+
+    seed_df = pd.DataFrame(seed_rows)
+    summary: dict[str, float] = {}
+    for metric in metric_cols:
+        vals = seed_df[metric].dropna()
+        summary[f"{metric}_mean"] = float(vals.mean()) if len(vals) > 0 else float("nan")
+        summary[f"{metric}_std"] = float(vals.std()) if len(vals) > 1 else float("nan")
+    return summary
+
+
 def build_cross_model_comparison(
     stage1_raw: pd.DataFrame,
     stage2_raw: pd.DataFrame,
@@ -88,7 +122,7 @@ def build_cross_model_comparison(
 
     agg_df = pd.DataFrame(rows)
 
-    # Summary collapsed across AD bins (macro-average per model × split_type)
+    # Weighted summary collapsed across AD bins per seed, then mean/std across seeds.
     summary_keys = (["dataset", "split_type", "model"] if has_dataset
                     else ["split_type", "model"])
     summary_rows = []
@@ -99,14 +133,28 @@ def build_cross_model_comparison(
         else:
             split_type, model = key
             s_row = {"split_type": split_type, "model": model}
-        for m in metric_cols:
-            vals = grp[m].dropna()
-            s_row[f"{m}_mean"] = float(vals.mean()) if len(vals) > 0 else float("nan")
-            s_row[f"{m}_std"] = float(vals.std()) if len(vals) > 1 else float("nan")
+        s_row.update(_summarize_weighted_across_bins(grp, metric_cols))
         summary_rows.append(s_row)
     summary_df = pd.DataFrame(summary_rows)
 
+    # Preserve the old equal-bin macro-average for auditability.
+    macro_rows = []
+    for key, grp in combined.groupby(summary_keys, observed=True):
+        if has_dataset:
+            dataset_val, split_type, model = key
+            macro_row: dict = {"dataset": dataset_val, "split_type": split_type, "model": model}
+        else:
+            split_type, model = key
+            macro_row = {"split_type": split_type, "model": model}
+        for metric in metric_cols:
+            vals = grp[metric].dropna()
+            macro_row[f"{metric}_mean"] = float(vals.mean()) if len(vals) > 0 else float("nan")
+            macro_row[f"{metric}_std"] = float(vals.std()) if len(vals) > 1 else float("nan")
+        macro_rows.append(macro_row)
+    macro_summary_df = pd.DataFrame(macro_rows)
+
     agg_df.to_csv(out_dir / "cross_model_ad_bins.csv", index=False)
     summary_df.to_csv(out_dir / "cross_model_summary.csv", index=False)
+    macro_summary_df.to_csv(out_dir / "cross_model_summary_macro.csv", index=False)
 
     return agg_df

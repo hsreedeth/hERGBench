@@ -75,7 +75,7 @@ for f in \
 done
 
 # Split dirs
-for dir_path in "data/splits" "data/chembl/splits"; do
+for dir_path in "hERGBench_Stage1_SignOff_v2_triple_seed11/inputs/splits" "data/chembl/splits"; do
     count=$(ls "${dir_path}"/*.csv 2>/dev/null | wc -l | tr -d ' ')
     if [[ "${count}" -lt 15 ]]; then
         echo "  WARNING: only ${count}/15 split CSVs in ${dir_path}"

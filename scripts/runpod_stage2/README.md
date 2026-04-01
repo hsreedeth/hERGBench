@@ -79,6 +79,7 @@ tmux attach -t stage2_runpod
 - For cross-model comparison in Step 06:
   - `reports/multiseed_analysis/multiseed_ad_bins_raw.csv`
   - `reports/chembl_multiseed_analysis/multiseed_ad_bins_raw.csv`
+  - unpacked archives may also land under `reports/reports/...`; Step 06 auto-detects those paths
 
 ## Main outputs
 
@@ -95,6 +96,7 @@ Cross-model comparison:
 
 - `reports/cross_model_comparison/cross_model_ad_bins.csv`
 - `reports/cross_model_comparison/cross_model_summary.csv`
+- `reports/cross_model_comparison/cross_model_summary_macro.csv`
 
 Package:
 

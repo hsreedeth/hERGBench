@@ -27,8 +27,23 @@ from pathlib import Path
 import pandas as pd
 from hergbench.analysis.calibration_by_bin import build_cross_model_comparison
 
-S1_TDC    = Path("reports/multiseed_analysis/multiseed_ad_bins_raw.csv")
-S1_CHEMBL = Path("reports/chembl_multiseed_analysis/multiseed_ad_bins_raw.csv")
+def resolve_first_existing(candidates):
+    for candidate in candidates:
+        path = Path(candidate)
+        if path.exists():
+            return path
+    return None
+
+
+S1_TDC = resolve_first_existing([
+    "reports/multiseed_analysis/multiseed_ad_bins_raw.csv",
+    "reports/reports/multiseed_analysis_tdc/multiseed_ad_bins_raw.csv",
+    "reports/reports/multiseed_analysis/multiseed_ad_bins_raw.csv",
+])
+S1_CHEMBL = resolve_first_existing([
+    "reports/chembl_multiseed_analysis/multiseed_ad_bins_raw.csv",
+    "reports/reports/chembl_multiseed_analysis/multiseed_ad_bins_raw.csv",
+])
 S2_TDC    = Path("reports/stage2_multiseed_analysis/stage2_ad_bins_raw.csv")
 S2_CHEMBL = Path("reports/chembl_stage2_multiseed_analysis/stage2_ad_bins_raw.csv")
 
@@ -39,7 +54,7 @@ for path, label, parts in [
     (S1_TDC,    "tdc",    s1_parts),
     (S1_CHEMBL, "chembl", s1_parts),
 ]:
-    if path.exists():
+    if path is not None and path.exists():
         df = pd.read_csv(path)
         if "dataset" not in df.columns:
             df.insert(0, "dataset", label)
