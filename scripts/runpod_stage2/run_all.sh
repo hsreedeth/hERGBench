@@ -15,6 +15,7 @@ cd "$(stage2_repo_root)"
 
 USE_TMUX="${USE_TMUX:-0}"
 TMUX_SESSION="${TMUX_SESSION:-stage2_runpod}"
+TMUX_LOG="${TMUX_LOG:-/workspace/stage2_runpod.log}"
 
 if [[ "${USE_TMUX}" == "1" ]] && [[ -z "${TMUX:-}" ]]; then
     if ! command -v tmux >/dev/null 2>&1; then
@@ -26,9 +27,11 @@ if [[ "${USE_TMUX}" == "1" ]] && [[ -z "${TMUX:-}" ]]; then
         echo "Attach with: tmux attach -t ${TMUX_SESSION}" >&2
         exit 1
     fi
-    tmux new-session -d -s "${TMUX_SESSION}" "cd $(pwd) && USE_TMUX=0 bash scripts/runpod_stage2/run_all.sh"
+    tmux new-session -d -s "${TMUX_SESSION}" \
+        "cd $(pwd) && USE_TMUX=0 bash scripts/runpod_stage2/run_all.sh 2>&1 | tee '${TMUX_LOG}'; status=\${PIPESTATUS[0]}; echo; echo \"Stage 2 workflow exited with status \${status}. Log: ${TMUX_LOG}\"; exec bash"
     echo "Started detached tmux session: ${TMUX_SESSION}"
     echo "Attach with: tmux attach -t ${TMUX_SESSION}"
+    echo "Log file: ${TMUX_LOG}"
     exit 0
 fi
 
