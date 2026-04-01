@@ -28,7 +28,7 @@ chemprop:
   warmup_epochs: 2
   data_seed: 42
   pytorch_seed: 33
-  accelerator: cpu
+  accelerator: cuda
   devices: 1
 calibration:
   enabled: true

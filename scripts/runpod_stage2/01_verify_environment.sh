@@ -31,6 +31,28 @@ echo ""
 # PyTorch + CUDA
 python scripts/runpod_4090/check_torch_cuda.py
 
+# NumPy ABI sanity check before touching RDKit/ChemProp wheels.
+python - <<'PY'
+import sys
+
+try:
+    import numpy as np
+except Exception as exc:  # pragma: no cover - shell preflight path
+    print(f"ERROR: numpy import failed: {exc}", file=sys.stderr)
+    raise SystemExit(1)
+
+print(f"  numpy:     {np.__version__}")
+
+major = int(np.__version__.split(".", 1)[0])
+if major >= 2:
+    print(
+        "ERROR: NumPy 2.x detected. Current rdkit/chemprop wheels on RunPod require NumPy < 2.\n"
+        "Run: bash scripts/runpod_4090/02_setup_repo_env.sh",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+PY
+
 # ChemProp
 if ! python -c "import chemprop" >/dev/null 2>&1; then
     echo "ERROR: chemprop not importable. Run 02_setup (from runpod_4090) first." >&2
