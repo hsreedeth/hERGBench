@@ -10,7 +10,27 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$(cd "${SCRIPT_DIR}/../.." && pwd)"
+source "${SCRIPT_DIR}/_common.sh"
+cd "$(stage2_repo_root)"
+
+USE_TMUX="${USE_TMUX:-0}"
+TMUX_SESSION="${TMUX_SESSION:-stage2_runpod}"
+
+if [[ "${USE_TMUX}" == "1" ]] && [[ -z "${TMUX:-}" ]]; then
+    if ! command -v tmux >/dev/null 2>&1; then
+        echo "ERROR: tmux not installed. Install tmux or run without USE_TMUX=1." >&2
+        exit 1
+    fi
+    if tmux has-session -t "${TMUX_SESSION}" 2>/dev/null; then
+        echo "ERROR: tmux session '${TMUX_SESSION}' already exists." >&2
+        echo "Attach with: tmux attach -t ${TMUX_SESSION}" >&2
+        exit 1
+    fi
+    tmux new-session -d -s "${TMUX_SESSION}" "cd $(pwd) && USE_TMUX=0 bash scripts/runpod_stage2/run_all.sh"
+    echo "Started detached tmux session: ${TMUX_SESSION}"
+    echo "Attach with: tmux attach -t ${TMUX_SESSION}"
+    exit 0
+fi
 
 echo "=== Stage 2 D-MPNN Multi-Seed Benchmark (Both Datasets) ==="
 echo "Started: $(date)"

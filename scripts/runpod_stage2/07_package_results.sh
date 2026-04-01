@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 07_package_results.sh — Bundle all Stage 2 outputs, models, and provenance.
+# 07_package_results.sh — Bundle Stage 2 outputs, selected run dirs, and provenance.
 #
 # Run from repo root:
 #   bash scripts/runpod_stage2/07_package_results.sh
@@ -7,68 +7,80 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+source "${SCRIPT_DIR}/_common.sh"
+REPO_ROOT="$(stage2_repo_root)"
 cd "${REPO_ROOT}"
 
-VENV_DIR="${VENV_DIR:-/workspace/hERGBench/.venv}"
-if [[ -f "${VENV_DIR}/bin/activate" ]]; then
-    source "${VENV_DIR}/bin/activate"
-fi
+activate_stage2_venv "${REPO_ROOT}" || true
 
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 ARCHIVE_NAME="hERGBench_Stage2_results_${TIMESTAMP}.tar.gz"
 
 echo "=== 07 Package Stage 2 results ==="
 
-# Provenance: git hash, GPU info, pip freeze
 PROV_DIR="reports/stage2_provenance"
 mkdir -p "${PROV_DIR}"
 
 git rev-parse HEAD > "${PROV_DIR}/git_commit.txt" 2>/dev/null || echo "unknown" > "${PROV_DIR}/git_commit.txt"
 git diff --stat HEAD >> "${PROV_DIR}/git_commit.txt" 2>/dev/null || true
-
 nvidia-smi --query-gpu=name,driver_version,memory.total \
     --format=csv,noheader > "${PROV_DIR}/gpu_info.txt" 2>/dev/null || echo "no GPU" > "${PROV_DIR}/gpu_info.txt"
-
 python -m pip freeze > "${PROV_DIR}/pip_freeze.txt" 2>/dev/null || true
 
 echo "  provenance written to ${PROV_DIR}/"
 
-# Collect directories to pack
-DIRS_TO_PACK=()
+PACKAGE_LIST="${PROV_DIR}/package_manifest.txt"
+: > "${PACKAGE_LIST}"
+
 for d in \
     "reports/stage2_multiseed_analysis" \
     "reports/chembl_stage2_multiseed_analysis" \
     "reports/cross_model_comparison" \
     "reports/stage2_provenance" \
+    "configs/stage2_multiseed" \
     "configs/chembl_stage2_multiseed"; do
     if [[ -d "${d}" ]]; then
-        DIRS_TO_PACK+=("${d}")
+        echo "${d}" >> "${PACKAGE_LIST}"
         echo "  including: ${d}"
     else
         echo "  skipping (not found): ${d}"
     fi
 done
 
-# Include run dirs (models + predictions) if they exist
-if [[ -d "reports/runs" ]]; then
-    STAGE2_RUNS=$(ls -d reports/runs/*stage2_chemprop* 2>/dev/null | wc -l | tr -d ' ')
-    if [[ "${STAGE2_RUNS}" -gt 0 ]]; then
-        DIRS_TO_PACK+=("reports/runs")
-        echo "  including: reports/runs  (${STAGE2_RUNS} stage2 run dirs)"
-    fi
-fi
+python - <<'PYEOF'
+from pathlib import Path
+import pandas as pd
 
-if [[ "${#DIRS_TO_PACK[@]}" -eq 0 ]]; then
+package_list = Path("reports/stage2_provenance/package_manifest.txt")
+manifest_paths = [
+    Path("reports/stage2_multiseed_analysis/stage2_run_manifest.csv"),
+    Path("reports/chembl_stage2_multiseed_analysis/stage2_run_manifest.csv"),
+]
+
+run_dirs = []
+for manifest_path in manifest_paths:
+    if not manifest_path.exists():
+        continue
+    df = pd.read_csv(manifest_path)
+    for run_dir in df["run_dir"].astype(str).tolist():
+        run_dirs.append(run_dir)
+
+for run_dir in sorted(set(run_dirs)):
+    package_list.write_text(package_list.read_text() + f"{run_dir}\n")
+    print(f"  including run dir: {run_dir}")
+PYEOF
+
+if [[ ! -s "${PACKAGE_LIST}" ]]; then
     echo "ERROR: nothing to package. Run steps 03-06 first." >&2
     exit 1
 fi
 
-tar -czf "${ARCHIVE_NAME}" "${DIRS_TO_PACK[@]}"
+tar -czf "${ARCHIVE_NAME}" -T "${PACKAGE_LIST}"
+
 echo ""
 echo "  Archive: ${ARCHIVE_NAME}"
 echo "  Size:    $(du -sh "${ARCHIVE_NAME}" | cut -f1)"
 echo ""
 echo "Download with:"
-echo "  scp -P \${POD_PORT} \${POD_HOST}:$(pwd)/${ARCHIVE_NAME} ."
+echo "  scp -P <PORT> root@<HOST>:$(pwd)/${ARCHIVE_NAME} ."
 echo "=== 07 Complete ==="

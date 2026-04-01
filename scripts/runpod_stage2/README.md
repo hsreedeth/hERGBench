@@ -1,27 +1,39 @@
 # RunPod – Stage 2 D-MPNN Multi-seed Benchmark
 
-Full pipeline for running Stage 2 (ChemProp D-MPNN) across both datasets
-(TDC + ChEMBL), all 3 split types, and 5 seeds on a RunPod RTX 4090 instance.
+Run the existing Stage 2 ChemProp pipeline on RunPod across both datasets:
 
-## Overview
+- TDC: fixed split membership `seed11`, varying `pytorch_seed`
+- ChEMBL: varying data split seed, fixed `pytorch_seed=42`
+
+This workflow is now:
+
+- GPU-explicit
+- tmux-friendly
+- resumable via manifest CSVs
+- aggregation-only in Step 05
+
+## Scripts
 
 | Step | Script | What it does |
 |------|--------|--------------|
-| 01 | `01_verify_environment.sh` | GPU check, CUDA, ChemProp, datasets |
-| 02 | `02_generate_configs.sh` | Generate ChEMBL configs; verify TDC configs |
-| 03 | `03_run_tdc_stage2.sh` | Train all 15 TDC Stage 2 configs |
-| 04 | `04_run_chembl_stage2.sh` | Train all 15 ChEMBL Stage 2 configs |
-| 05 | `05_compute_ad_bins.sh` | Aggregate AD-bin metrics for each dataset |
-| 06 | `06_cross_model_comparison.sh` | Merge Stage 1 + Stage 2 results |
-| 07 | `07_package_results.sh` | Tarball everything + provenance |
+| 01 | `01_verify_environment.sh` | checks GPU, CUDA, chemprop, datasets, splits |
+| 02 | `02_generate_configs.sh` | generates ChEMBL configs and patches all Stage 2 configs for CUDA |
+| 03 | `03_run_tdc_stage2.sh` | runs all TDC Stage 2 configs via the manifest-aware Python runner |
+| 04 | `04_run_chembl_stage2.sh` | runs all ChEMBL Stage 2 configs via the manifest-aware Python runner |
+| 05 | `05_compute_ad_bins.sh` | aggregates existing raw Stage 2 AD-bin CSVs only |
+| 06 | `06_cross_model_comparison.sh` | merges Stage 1 and Stage 2 AD-bin summaries |
+| 07 | `07_package_results.sh` | packages outputs, provenance, and only the run dirs listed in the manifests |
+| tmux | `run_all_tmux.sh` | launches the full workflow in a detached tmux session |
 
-Run everything at once:
-```bash
-bash scripts/runpod_stage2/run_all.sh
-```
+## Recommended run order
 
-Or step by step (each script is independently runnable):
+From the repo root on the pod:
+
 ```bash
+export VENV_DIR=/workspace/venv_hergbench
+export GPU_ID=0
+export SKIP_EXISTING=1
+
 bash scripts/runpod_stage2/01_verify_environment.sh
 bash scripts/runpod_stage2/02_generate_configs.sh
 bash scripts/runpod_stage2/03_run_tdc_stage2.sh
@@ -31,54 +43,59 @@ bash scripts/runpod_stage2/06_cross_model_comparison.sh
 bash scripts/runpod_stage2/07_package_results.sh
 ```
 
-## Prerequisites
+If you want it detached in tmux:
 
-- RunPod instance with CUDA GPU (RTX 4090 recommended)
-- Repo synced via `sync_to_pod.sh`
-- Both datasets present:
-  - `data/processed/herg_clean.csv` + `data/splits/*.csv`
-  - `data/chembl/processed/chembl_herg_clean.csv` + `data/chembl/splits/*.csv`
-- Stage 1 results present for cross-model comparison (optional, step 06):
+```bash
+export VENV_DIR=/workspace/venv_hergbench
+export GPU_ID=0
+export SKIP_EXISTING=1
+bash scripts/runpod_stage2/run_all_tmux.sh
+tmux attach -t stage2_runpod
+```
+
+## Important behavior
+
+- `VENV_DIR` is auto-detected if unset. The scripts will try:
+  - `${VENV_DIR}`
+  - `/workspace/hERGBench/.venv`
+  - `/workspace/venv_hergbench`
+- Step 02 patches both TDC and ChEMBL Stage 2 configs to:
+  - `chemprop.accelerator = cuda`
+  - `chemprop.devices = 1`
+- Steps 03 and 04 write:
+  - `stage2_ad_bins_raw.csv`
+  - `stage2_run_manifest.csv`
+- Step 05 does not retrain anything. It only aggregates existing raw CSVs.
+- Step 07 only packages run directories listed in the Stage 2 manifests.
+
+## Inputs expected on the pod
+
+- TDC dataset and splits:
+  - `data/processed/herg_clean.csv`
+  - `data/splits/*.csv`
+- ChEMBL dataset and splits:
+  - `data/chembl/processed/chembl_herg_clean.csv`
+  - `data/chembl/splits/*.csv`
+- For cross-model comparison in Step 06:
   - `reports/multiseed_analysis/multiseed_ad_bins_raw.csv`
   - `reports/chembl_multiseed_analysis/multiseed_ad_bins_raw.csv`
 
-## Runtime estimate (RTX 4090)
+## Main outputs
 
-| Dataset | Runs | Est. per run | Total |
-|---------|------|-------------|-------|
-| TDC (seed-varied torch) | 15 | ~15 min | ~3.75 h |
-| ChEMBL (data-split-varied) | 15 | ~12 min | ~3.0 h |
-| **Total** | **30** | | **~7 h** |
+Stage 2 analysis:
 
-`SKIP_EXISTING=1` (default) resumes interrupted sweeps without retraining.
+- `reports/stage2_multiseed_analysis/stage2_ad_bins_raw.csv`
+- `reports/stage2_multiseed_analysis/stage2_ad_bins_aggregated.csv`
+- `reports/stage2_multiseed_analysis/stage2_run_manifest.csv`
+- `reports/chembl_stage2_multiseed_analysis/stage2_ad_bins_raw.csv`
+- `reports/chembl_stage2_multiseed_analysis/stage2_ad_bins_aggregated.csv`
+- `reports/chembl_stage2_multiseed_analysis/stage2_run_manifest.csv`
 
-## Environment variables
+Cross-model comparison:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `VENV_DIR` | `/workspace/hERGBench/.venv` | Python venv path |
-| `SKIP_EXISTING` | `1` | Set to `0` to force full retrain |
-| `GPU_ID` | `0` | CUDA device index |
+- `reports/cross_model_comparison/cross_model_ad_bins.csv`
+- `reports/cross_model_comparison/cross_model_summary.csv`
 
-## Output files
+Package:
 
-```
-reports/stage2_multiseed_analysis/
-  stage2_ad_bins_raw.csv
-  stage2_ad_bins_aggregated.csv
-  stage2_run_manifest.csv
-
-reports/chembl_stage2_multiseed_analysis/
-  stage2_ad_bins_raw.csv
-  stage2_ad_bins_aggregated.csv
-  stage2_run_manifest.csv
-
-reports/cross_model_comparison/
-  cross_model_ad_bins.csv      ← main result table
-  cross_model_summary.csv
-
-reports/runs/
-  <timestamp>_stage2_chemprop_*/   ← per-run dirs (models, preds, tables)
-
-hERGBench_Stage2_results_<timestamp>.tar.gz
-```
+- `hERGBench_Stage2_results_<timestamp>.tar.gz`

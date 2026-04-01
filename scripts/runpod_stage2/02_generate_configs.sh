@@ -9,13 +9,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+source "${SCRIPT_DIR}/_common.sh"
+REPO_ROOT="$(stage2_repo_root)"
 cd "${REPO_ROOT}"
 
-VENV_DIR="${VENV_DIR:-/workspace/hERGBench/.venv}"
-if [[ -f "${VENV_DIR}/bin/activate" ]]; then
-    source "${VENV_DIR}/bin/activate"
-fi
+activate_stage2_venv "${REPO_ROOT}" || true
 
 echo "=== 02 Generate Stage 2 Configs ==="
 
@@ -38,6 +36,21 @@ if [[ "${TDC_COUNT}" -ne 15 ]]; then
     echo "       Re-run: python src/make_stage2_multiseed_configs.py" >&2
     exit 1
 fi
+
+echo "  Patching all Stage 2 configs for explicit GPU execution on RunPod..."
+python - <<'PYEOF'
+from pathlib import Path
+import yaml
+
+for config_dir in [Path("configs/stage2_multiseed"), Path("configs/chembl_stage2_multiseed")]:
+    for path in sorted(config_dir.glob("*.yaml")):
+        cfg = yaml.safe_load(path.read_text())
+        cfg.setdefault("chemprop", {})
+        cfg["chemprop"]["accelerator"] = "cuda"
+        cfg["chemprop"]["devices"] = 1
+        path.write_text(yaml.safe_dump(cfg, sort_keys=False))
+        print(f"    GPU-ready: {path}")
+PYEOF
 
 echo ""
 echo "=== 02 Config generation complete ==="

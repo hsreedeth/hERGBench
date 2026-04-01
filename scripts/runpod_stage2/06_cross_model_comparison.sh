@@ -13,13 +13,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+source "${SCRIPT_DIR}/_common.sh"
+REPO_ROOT="$(stage2_repo_root)"
 cd "${REPO_ROOT}"
 
-VENV_DIR="${VENV_DIR:-/workspace/hERGBench/.venv}"
-if [[ -f "${VENV_DIR}/bin/activate" ]]; then
-    source "${VENV_DIR}/bin/activate"
-fi
+activate_stage2_venv "${REPO_ROOT}" || true
 
 echo "=== 06 Cross-model comparison (XGBoost vs D-MPNN) ==="
 

@@ -7,22 +7,15 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+source "${SCRIPT_DIR}/_common.sh"
+REPO_ROOT="$(stage2_repo_root)"
 cd "${REPO_ROOT}"
-
-VENV_DIR="${VENV_DIR:-/workspace/hERGBench/.venv}"
 
 echo "=== 01 Verify Stage 2 Environment ==="
 echo "  hostname:  $(hostname)"
 echo "  repo root: ${REPO_ROOT}"
 
-# Activate venv if present
-if [[ -f "${VENV_DIR}/bin/activate" ]]; then
-    source "${VENV_DIR}/bin/activate"
-    echo "  venv:      ${VENV_DIR}"
-else
-    echo "  WARNING: venv not found at ${VENV_DIR} — using system Python"
-fi
+activate_stage2_venv "${REPO_ROOT}" || true
 
 python --version
 

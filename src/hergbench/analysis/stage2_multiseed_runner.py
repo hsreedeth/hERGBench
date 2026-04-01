@@ -147,6 +147,71 @@ def _append_manifest(manifest_path: Path, config_stem: str, run_dir: Path) -> No
         row.to_csv(manifest_path, index=False)
 
 
+def _rebuild_manifest_from_runs(
+    manifest_path: Path,
+    dataset: str,
+    config_paths: list[Path],
+    runs_root: Path,
+) -> int:
+    """Best-effort manifest reconstruction from completed run dirs.
+
+    This allows the shell workflow to recover from older runs where the raw CSV
+    exists but the manifest was never written.
+    """
+    if not runs_root.exists():
+        return 0
+
+    wanted = {}
+    for config_path in config_paths:
+        parsed = _parse_config(config_path)
+        wanted[config_path.stem] = parsed
+
+    matches: dict[str, Path] = {}
+    for run_dir in runs_root.glob("*stage2_chemprop*"):
+        meta_path = run_dir / "run_metadata.json"
+        ad_path = run_dir / "tables" / "applicability_domain_bins.csv"
+        if not meta_path.exists() or not ad_path.exists():
+            continue
+
+        try:
+            meta = yaml.safe_load(meta_path.read_text())
+        except Exception:
+            continue
+
+        dataset_path = str(meta.get("dataset_path", ""))
+        is_chembl_run = "data/chembl/" in dataset_path
+        if dataset == "chembl" and not is_chembl_run:
+            continue
+        if dataset == "tdc" and is_chembl_run:
+            continue
+
+        membership_path = str(meta.get("membership_path", ""))
+        split_type = _infer_split_type(membership_path)
+        stem = Path(membership_path).stem
+        m = re.search(r"seed(\d+)", stem)
+        data_seed = int(m.group(1)) if m else 0
+        train_cfg = meta.get("train_config", {}) or {}
+        pytorch_seed = int(train_cfg.get("pytorch_seed", 0))
+
+        for config_stem, parsed in wanted.items():
+            if parsed["split_type"] != split_type:
+                continue
+            if parsed["data_seed"] != data_seed:
+                continue
+            if parsed["pytorch_seed"] != pytorch_seed:
+                continue
+            current = matches.get(config_stem)
+            if current is None or run_dir.stat().st_mtime > current.stat().st_mtime:
+                matches[config_stem] = run_dir
+
+    if not matches:
+        return 0
+
+    rows = [{"config_stem": stem, "run_dir": str(path)} for stem, path in sorted(matches.items())]
+    pd.DataFrame(rows).to_csv(manifest_path, index=False)
+    return len(rows)
+
+
 # ── Main runner ───────────────────────────────────────────────────────────────
 
 def run_stage2_multiseed(
@@ -193,14 +258,18 @@ def run_stage2_multiseed(
     runs_root_path = Path(runs_root)
     manifest_path = out_dir / "stage2_run_manifest.csv"
 
-    raw_path = out_dir / "stage2_ad_bins_raw.csv"
-    if skip_existing and raw_path.exists():
-        logger.info("Loading existing Stage 2 raw results from %s", raw_path)
-        return pd.read_csv(raw_path)
-
     configs = sorted(Path(config_dir).glob("*.yaml"))
     if not configs:
         raise FileNotFoundError(f"No YAML configs found in {config_dir}")
+
+    raw_path = out_dir / "stage2_ad_bins_raw.csv"
+    if skip_existing and raw_path.exists():
+        if not manifest_path.exists():
+            rebuilt = _rebuild_manifest_from_runs(manifest_path, dataset, configs, runs_root_path)
+            if rebuilt:
+                logger.info("Rebuilt missing manifest from %d completed run dirs: %s", rebuilt, manifest_path)
+        logger.info("Loading existing Stage 2 raw results from %s", raw_path)
+        return pd.read_csv(raw_path)
 
     manifest = _load_manifest(manifest_path)
 

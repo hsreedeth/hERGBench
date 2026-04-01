@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# 05_compute_ad_bins.sh — Collect AD-bin metrics from all completed Stage 2 run dirs.
+# 05_compute_ad_bins.sh — Aggregate Stage 2 AD-bin metrics from existing raw CSVs.
 #
-# Reads tables/applicability_domain_bins.csv from each run dir under reports/runs/
-# and aggregates by dataset, split_type, seed, and sim_bin.
+# This step is intentionally aggregation-only. It does not launch training jobs.
 #
 # Run from repo root:
 #   bash scripts/runpod_stage2/05_compute_ad_bins.sh
@@ -10,34 +9,43 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+source "${SCRIPT_DIR}/_common.sh"
+REPO_ROOT="$(stage2_repo_root)"
 cd "${REPO_ROOT}"
 
-VENV_DIR="${VENV_DIR:-/workspace/hERGBench/.venv}"
-if [[ -f "${VENV_DIR}/bin/activate" ]]; then
-    source "${VENV_DIR}/bin/activate"
-fi
+activate_stage2_venv "${REPO_ROOT}" || true
 
 echo "=== 05 Compute AD-bin metrics for Stage 2 ==="
 
 python - <<'PYEOF'
-import logging
 import sys
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-8s %(message)s", datefmt="%H:%M:%S")
+from pathlib import Path
 
-from hergbench.analysis.stage2_multiseed_runner import run_stage2_multiseed, aggregate_stage2_results
+import pandas as pd
 
-for dataset in ["tdc", "chembl"]:
+from hergbench.analysis.stage2_multiseed_runner import aggregate_stage2_results
+
+datasets = {
+    "tdc": Path("reports/stage2_multiseed_analysis"),
+    "chembl": Path("reports/chembl_stage2_multiseed_analysis"),
+}
+
+for dataset, out_dir in datasets.items():
+    raw_path = out_dir / "stage2_ad_bins_raw.csv"
     print(f"\n--- {dataset.upper()} ---")
-    try:
-        raw = run_stage2_multiseed(dataset=dataset, skip_existing=True, allow_gpu=False)
-        if raw.empty:
-            print(f"  No rows collected for {dataset}. Did the runs complete?")
-            continue
-        agg = aggregate_stage2_results(raw)
-        print(agg.to_string(index=False))
-    except Exception as exc:
-        print(f"  ERROR: {exc}", file=sys.stderr)
+    if not raw_path.exists():
+        print(f"  ERROR: missing {raw_path}. Run the training step first.", file=sys.stderr)
+        continue
+
+    raw = pd.read_csv(raw_path)
+    if raw.empty:
+        print(f"  ERROR: {raw_path} is empty.", file=sys.stderr)
+        continue
+
+    agg = aggregate_stage2_results(raw, output_dir=str(out_dir))
+    print(agg.to_string(index=False))
+    print(f"  Aggregated: {out_dir / 'stage2_ad_bins_aggregated.csv'}")
+
 PYEOF
 
 echo ""
