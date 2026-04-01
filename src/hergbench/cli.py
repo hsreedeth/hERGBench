@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from typing import Optional
 
+import pandas as pd
 import typer
 
 from hergbench.utils.config import load_config
@@ -169,6 +171,98 @@ def stage1(
     run_stage1(cfg=cfg, run_dir=run_dir, logger=logger)
 
     logger.info("Stage 1 completed successfully. Artifacts at: %s", run_dir)
+
+
+@app.command()
+def build_panel(
+    predictions_csv: Path = typer.Option(
+        ...,
+        "--predictions-csv",
+        "-p",
+        help="Path to a test_preds_*_with_sim.csv from a completed Stage 1 run.",
+    ),
+    train_csv: Path = typer.Option(
+        ...,
+        "--train-csv",
+        "-t",
+        help="CSV with training-set rows (must contain 'smiles' and 'y' columns).",
+    ),
+    threshold: float = typer.Option(
+        0.56,
+        "--threshold",
+        help="Decision threshold used in the run.",
+    ),
+    seed: int = typer.Option(42, "--seed", help="Random seed for panel sampling."),
+    n_total: int = typer.Option(30, "--n-total", help="Total panel size."),
+    output: Optional[Path] = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Output CSV path. Default: configs/panels/stratified_panel_seed{seed}_n{n}.csv",
+    ),
+) -> None:
+    """Build a stratified lead panel from a completed Stage 1 run.
+
+    Reads calibrated predictions from a Stage 1 predictions CSV and produces
+    a stratified 30-compound panel across three risk strata (A/B/C) and all
+    four applicability-domain bins.
+    """
+    from hergbench.analysis.panel_builder import build_stratified_panel, panel_summary
+    from hergbench.features.fingerprints import FingerprintConfig, smiles_list_to_fps
+
+    predictions_csv = _require_existing_file(predictions_csv, "--predictions-csv")
+    train_csv = _require_existing_file(train_csv, "--train-csv")
+
+    preds_df = pd.read_csv(predictions_csv)
+
+    # Map column names from Stage 1 output format to panel_builder expectations
+    col_map = {}
+    if "p_cal" in preds_df.columns and "p_calibrated" not in preds_df.columns:
+        col_map["p_cal"] = "p_calibrated"
+    if "y" in preds_df.columns and "y_true" not in preds_df.columns:
+        col_map["y"] = "y_true"
+    if col_map:
+        preds_df = preds_df.rename(columns=col_map)
+
+    required = {"smiles", "y_true", "p_calibrated"}
+    missing = required - set(preds_df.columns)
+    if missing:
+        raise typer.BadParameter(
+            f"predictions-csv is missing required columns: {missing}. "
+            f"Available columns: {list(preds_df.columns)}",
+            param_hint="--predictions-csv",
+        )
+
+    train_df = pd.read_csv(train_csv)
+    if "smiles" not in train_df.columns:
+        raise typer.BadParameter(
+            "train-csv must contain a 'smiles' column.", param_hint="--train-csv"
+        )
+
+    fp_cfg = FingerprintConfig(radius=2, n_bits=2048)
+    train_smiles = train_df["smiles"].astype(str).tolist()
+    train_fps, _ = smiles_list_to_fps(train_smiles, fp_cfg)
+
+    panel = build_stratified_panel(
+        predictions_df=preds_df,
+        train_smiles=train_smiles,
+        train_fps=train_fps,
+        fp_cfg=fp_cfg,
+        threshold=threshold,
+        n_total=n_total,
+        seed=seed,
+    )
+
+    if output is None:
+        out_path = Path("configs/panels") / f"stratified_panel_seed{seed}_n{n_total}.csv"
+    else:
+        out_path = output
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    panel.to_csv(out_path, index=False)
+
+    typer.echo(panel_summary(panel))
+    typer.echo(f"\nPanel saved to: {out_path}  (n={len(panel)})")
 
 
 if __name__ == "__main__":
