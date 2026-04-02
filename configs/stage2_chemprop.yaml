@@ -15,7 +15,7 @@ splits:
 chemprop:
   task_type: classification
   metrics: [prc, roc]
-  tracking_metric: prc
+  tracking_metric: auroc
   epochs: 80
   patience: 10
 

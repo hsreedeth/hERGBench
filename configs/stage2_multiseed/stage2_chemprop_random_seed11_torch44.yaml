@@ -14,7 +14,7 @@ chemprop:
   metrics:
   - prc
   - roc
-  tracking_metric: prc
+  tracking_metric: auroc
   epochs: 80
   patience: 10
   batch_size: 64
@@ -28,17 +28,21 @@ chemprop:
   warmup_epochs: 2
   data_seed: 42
   pytorch_seed: 44
-  accelerator: cuda
+  accelerator: cpu
   devices: 1
 calibration:
   enabled: true
-  method: platt
-  eps: 1.0e-06
+  method: none
+  threshold_metric: youden
+  n_bins: 10
 evaluation:
   ad_bins:
   - 0.3
   - 0.5
   - 0.7
+  fp_radius: 2
+  fp_n_bits: 2048
+  boostrap_B: 2000
 reporting:
   run_root: reports/runs
   save_preds: true
