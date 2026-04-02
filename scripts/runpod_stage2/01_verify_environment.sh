@@ -75,15 +75,29 @@ for f in \
 done
 
 # Split dirs
-for dir_path in "hERGBench_Stage1_SignOff_v2_triple_seed11/inputs/splits" "data/chembl/splits"; do
-    count=$(ls "${dir_path}"/*.csv 2>/dev/null | wc -l | tr -d ' ')
-    if [[ "${count}" -lt 15 ]]; then
-        echo "  WARNING: only ${count}/15 split CSVs in ${dir_path}"
-        ERRORS=$((ERRORS + 1))
-    else
-        echo "  splits OK: ${dir_path}  (${count} files)"
-    fi
-done
+# TDC Stage 2 uses fixed seed11 membership — only 3 files needed.
+TDC_SPLIT_DIR="hERGBench_Stage1_SignOff_v2_triple_seed11/inputs/splits"
+TDC_COUNT=$(ls \
+    "${TDC_SPLIT_DIR}"/random_seed11.csv \
+    "${TDC_SPLIT_DIR}"/scaffold_seed11.csv \
+    "${TDC_SPLIT_DIR}"/cluster_seed11.csv \
+    2>/dev/null | wc -l | tr -d ' ')
+if [[ "${TDC_COUNT}" -lt 3 ]]; then
+    echo "  WARNING: only ${TDC_COUNT}/3 TDC seed11 split CSVs in ${TDC_SPLIT_DIR}"
+    ERRORS=$((ERRORS + 1))
+else
+    echo "  splits OK: ${TDC_SPLIT_DIR}  (${TDC_COUNT}/3 seed11 files)"
+fi
+
+# ChEMBL uses varying data seeds — needs all 15 split files.
+CHEMBL_SPLIT_DIR="data/chembl/splits"
+CHEMBL_COUNT=$(ls "${CHEMBL_SPLIT_DIR}"/*.csv 2>/dev/null | wc -l | tr -d ' ')
+if [[ "${CHEMBL_COUNT}" -lt 15 ]]; then
+    echo "  WARNING: only ${CHEMBL_COUNT}/15 ChEMBL split CSVs in ${CHEMBL_SPLIT_DIR}"
+    ERRORS=$((ERRORS + 1))
+else
+    echo "  splits OK: ${CHEMBL_SPLIT_DIR}  (${CHEMBL_COUNT} files)"
+fi
 
 if [[ "${ERRORS}" -gt 0 ]]; then
     echo "ERROR: ${ERRORS} issue(s) found. Fix before continuing." >&2
