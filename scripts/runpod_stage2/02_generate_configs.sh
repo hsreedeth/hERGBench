@@ -65,6 +65,19 @@ for config_dir in [Path("configs/stage2_multiseed"), Path("configs/chembl_stage2
                 f"Calibration mismatch in {path}: expected {expected_cal}, found {actual_cal}"
             )
 print(f"  Calibration method validated across all configs: {expected_cal}")
+
+for config_dir in [Path("configs/stage2_multiseed"), Path("configs/chembl_stage2_multiseed")]:
+    for path in sorted(config_dir.glob("*.yaml")):
+        cfg = yaml.safe_load(path.read_text())
+        tm = cfg.get("chemprop", {}).get("tracking_metric", "NOT SET")
+        if tm == "prc":
+            raise SystemExit(
+                f"UNSAFE CONFIG: {path} uses tracking_metric=prc which "
+                f"checkpoints incorrectly in ChemProp 2.2.2. "
+                f"Change to auroc or apply the patch in "
+                f"scripts/chemprop_cli_patched.py."
+            )
+        print(f"    tracking_metric OK ({tm}): {path}")
 PYEOF
 
 echo ""

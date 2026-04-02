@@ -16,6 +16,10 @@ for split in splits:
         cfg["run_name"] = f"stage2_chemprop_dmnn__{split}__seed11__torch{s}"
         cfg["splits"]["membership_path"] = f"{SIGNOFF_SPLITS_ROOT}/{split}_seed11.csv"
         cfg["chemprop"]["pytorch_seed"] = s
+        # ChemProp 2.2.2: BinaryAUPRC.higher_is_better is unset (defaults False),
+        # causing mode='min' checkpointing. BinaryAUROC is correctly marked
+        # higher_is_better=True. Switch to auroc until upstream is patched.
+        cfg["chemprop"]["tracking_metric"] = "auroc"
         # Keep CPU guard in pipeline; leave accelerator/devices in config if you like.
 
         out = OUTDIR / f"stage2_chemprop_{split}_seed11_torch{s}.yaml"

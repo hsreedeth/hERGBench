@@ -59,6 +59,10 @@ for split in SPLIT_TYPES:
 
         cfg["chemprop"]["pytorch_seed"] = TORCH_SEED
         cfg["chemprop"]["data_seed"] = DATA_SEED
+        # ChemProp 2.2.2: BinaryAUPRC.higher_is_better is unset (defaults False),
+        # causing mode='min' checkpointing. BinaryAUROC is correctly marked
+        # higher_is_better=True. Switch to auroc until upstream is patched.
+        cfg["chemprop"]["tracking_metric"] = "auroc"
         cfg["chemprop"]["accelerator"] = "cuda"
         cfg["chemprop"]["devices"] = 1
 
