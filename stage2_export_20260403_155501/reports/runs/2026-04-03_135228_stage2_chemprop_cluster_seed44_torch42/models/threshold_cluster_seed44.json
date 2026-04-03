@@ -1,0 +1,5 @@
+{
+  "threshold": 0.49,
+  "calibration_method": "none",
+  "threshold_metric": "youden"
+}
