@@ -1,0 +1,43 @@
+{
+  "stage": 2,
+  "split_type": "cluster",
+  "dataset_path": "data/processed/herg_clean.csv",
+  "dataset_sha256": "12dc938790af37796f991b4fffa9ccd00e02321014bbc1bb716477217bddc143",
+  "membership_path": "hERGBench_Stage1_SignOff_v2_triple_seed11/inputs/splits/cluster_seed11.csv",
+  "train_config": {
+    "data_path": "reports/runs/2026-04-02_022447_stage2_chemprop_cluster_seed11_torch33/chemprop_input.csv",
+    "output_dir": "reports/runs/2026-04-02_022447_stage2_chemprop_cluster_seed11_torch33/models/chemprop_dmnn",
+    "smiles_col": "smiles",
+    "target_col": "y",
+    "task_type": "classification",
+    "metrics": [
+      "prc",
+      "roc"
+    ],
+    "tracking_metric": "auroc",
+    "epochs": 80,
+    "patience": 10,
+    "batch_size": 64,
+    "num_workers": 4,
+    "message_hidden_dim": 300,
+    "depth": 3,
+    "dropout": 0.0,
+    "init_lr": 0.0001,
+    "max_lr": 0.001,
+    "final_lr": 0.0001,
+    "warmup_epochs": 2,
+    "data_seed": 42,
+    "pytorch_seed": 33,
+    "accelerator": "cuda",
+    "devices": "1"
+  },
+  "postprocess": {
+    "calibration_method": "none",
+    "threshold_metric": "youden",
+    "ad_bins": [
+      0.3,
+      0.5,
+      0.7
+    ]
+  }
+}

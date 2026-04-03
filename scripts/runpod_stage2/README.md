@@ -22,7 +22,7 @@ This workflow is now:
 | 04 | `04_run_chembl_stage2.sh` | runs all ChEMBL Stage 2 configs via the manifest-aware Python runner |
 | 05 | `05_compute_ad_bins.sh` | aggregates existing raw Stage 2 AD-bin CSVs only |
 | 06 | `06_cross_model_comparison.sh` | merges Stage 1 and Stage 2 AD-bin summaries |
-| 07 | `07_package_results.sh` | packages outputs, provenance, and only the run dirs listed in the manifests |
+| 07 | `07_package_results.sh` | stages an exact export folder, archives superseded Stage 2 run dirs, and packages outputs listed in the manifests |
 | tmux | `run_all_tmux.sh` | launches the full workflow in a detached tmux session |
 
 ## Recommended run order
@@ -66,7 +66,9 @@ tmux attach -t stage2_runpod
   - `stage2_ad_bins_raw.csv`
   - `stage2_run_manifest.csv`
 - Step 05 does not retrain anything. It only aggregates existing raw CSVs.
+- Step 07 stages an exact export folder under `reports/stage2_exports/`.
 - Step 07 only packages run directories listed in the Stage 2 manifests.
+- Step 07 moves superseded `reports/runs/*stage2_chemprop*` directories not referenced by the current manifests into `reports/runs/archive_stage2_superseded/<timestamp>/`.
 
 ## Inputs expected on the pod
 
@@ -101,3 +103,5 @@ Cross-model comparison:
 Package:
 
 - `hERGBench_Stage2_results_<timestamp>.tar.gz`
+- `reports/stage2_exports/stage2_export_<timestamp>/`
+- `reports/runs/archive_stage2_superseded/<timestamp>/`
