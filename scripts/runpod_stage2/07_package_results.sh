@@ -1,5 +1,23 @@
 #!/usr/bin/env bash
-# 07_package_results.sh — Bundle Stage 2 outputs, selected run dirs, and provenance.
+# 07_package_results.sh — Bundle Stage 2 outputs for download.
+#
+# What is included in the export:
+#   - All 30 Stage 2 run directories (15 TDC + 15 ChEMBL), each containing:
+#       chemprop_input_full.csv               — full dataset with split labels
+#       predictions/preds.csv                 — raw model output probabilities
+#       predictions/test_preds_*_with_sim.csv — calibrated preds + AD similarity bins
+#       tables/applicability_domain_bins.csv  — per-run AD-bin metrics
+#       tables/benchmark_results.csv          — overall benchmark metrics
+#       models/calibrator_*.joblib            — fitted calibrator object
+#       models/threshold_*.json               — threshold & calibration metadata
+#   - reports/stage2_multiseed_analysis/      — TDC aggregated AD-bin results
+#   - reports/chembl_stage2_multiseed_analysis/ — ChEMBL aggregated AD-bin results
+#   - reports/cross_model_comparison/         — D-MPNN vs XGBoost comparison
+#   - configs/stage2_multiseed/               — TDC configs used
+#   - configs/chembl_stage2_multiseed/        — ChEMBL configs used
+#   - reports/stage2_provenance/              — git hash, pip freeze, GPU info
+#
+# FAILS if any manifest-listed run dir is missing (prevents silent partial exports).
 #
 # Run from repo root:
 #   bash scripts/runpod_stage2/07_package_results.sh
@@ -14,31 +32,93 @@ cd "${REPO_ROOT}"
 activate_stage2_venv "${REPO_ROOT}" || true
 
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
-ARCHIVE_NAME="hERGBench_Stage2_results_${TIMESTAMP}.tar.gz"
+EXPORT_LABEL="hERGBench_Stage2_FULL_${TIMESTAMP}"
+ARCHIVE_NAME="${EXPORT_LABEL}.tar.gz"
 EXPORT_ROOT="reports/stage2_exports"
-EXPORT_DIR="${EXPORT_ROOT}/stage2_export_${TIMESTAMP}"
+EXPORT_DIR="${EXPORT_ROOT}/${EXPORT_LABEL}"
 ARCHIVE_ROOT="reports/runs/archive_stage2_superseded"
 ARCHIVE_DIR="${ARCHIVE_ROOT}/${TIMESTAMP}"
 
 echo "=== 07 Package Stage 2 results ==="
+echo "    Export label  : ${EXPORT_LABEL}"
+echo "    Export dir    : ${EXPORT_DIR}"
+echo "    Archive       : ${ARCHIVE_NAME}"
+echo ""
 
 PROV_DIR="reports/stage2_provenance"
-mkdir -p "${PROV_DIR}"
-mkdir -p "${EXPORT_ROOT}" "${ARCHIVE_ROOT}"
+mkdir -p "${PROV_DIR}" "${EXPORT_ROOT}" "${ARCHIVE_ROOT}"
 
+# ── Provenance ────────────────────────────────────────────────────────────────
 git rev-parse HEAD > "${PROV_DIR}/git_commit.txt" 2>/dev/null || echo "unknown" > "${PROV_DIR}/git_commit.txt"
 git diff --stat HEAD >> "${PROV_DIR}/git_commit.txt" 2>/dev/null || true
 nvidia-smi --query-gpu=name,driver_version,memory.total \
     --format=csv,noheader > "${PROV_DIR}/gpu_info.txt" 2>/dev/null || echo "no GPU" > "${PROV_DIR}/gpu_info.txt"
 python -m pip freeze > "${PROV_DIR}/pip_freeze.txt" 2>/dev/null || true
 
-echo "  provenance written to ${PROV_DIR}/"
+echo "  Provenance written to ${PROV_DIR}/"
 
+# ── Pre-flight: verify all manifest run dirs exist ────────────────────────────
+python - <<'PYEOF'
+import sys
+from pathlib import Path
+import pandas as pd
+
+MANIFESTS = [
+    ("tdc",    Path("reports/stage2_multiseed_analysis/stage2_run_manifest.csv")),
+    ("chembl", Path("reports/chembl_stage2_multiseed_analysis/stage2_run_manifest.csv")),
+]
+
+missing = []
+found_total = 0
+for dataset, manifest_path in MANIFESTS:
+    if not manifest_path.exists():
+        print(f"  ERROR: manifest not found: {manifest_path}", file=sys.stderr)
+        sys.exit(1)
+    df = pd.read_csv(manifest_path)
+    # Deduplicate: keep latest entry per config_stem
+    latest = {}
+    for _, row in df.iterrows():
+        latest[str(row["config_stem"])] = str(row["run_dir"])
+    print(f"  {dataset.upper()}: {len(latest)} runs in manifest")
+    for config_stem, run_dir_str in sorted(latest.items()):
+        run_dir = Path(run_dir_str) if Path(run_dir_str).is_absolute() else Path.cwd() / run_dir_str
+        # Verify required files are present
+        required = [
+            run_dir / "chemprop_input_full.csv",
+            run_dir / "predictions" / "preds.csv",
+            run_dir / "tables" / "applicability_domain_bins.csv",
+        ]
+        for req in required:
+            if not req.exists():
+                missing.append(f"{dataset}/{config_stem}: {req}")
+        if run_dir.exists():
+            found_total += 1
+            print(f"    OK  {run_dir.name}")
+        else:
+            missing.append(f"{dataset}/{config_stem}: run dir not found: {run_dir}")
+            print(f"    MISSING  {run_dir}", file=sys.stderr)
+
+if missing:
+    print(f"\n{'='*60}", file=sys.stderr)
+    print(f"PREFLIGHT FAILED — {len(missing)} missing items:", file=sys.stderr)
+    for m in missing:
+        print(f"  {m}", file=sys.stderr)
+    print(f"\nRe-run the training steps with SKIP_EXISTING=0 before packaging.", file=sys.stderr)
+    print(f"{'='*60}", file=sys.stderr)
+    sys.exit(1)
+
+print(f"\n  Pre-flight passed: {found_total} run dirs verified.")
+PYEOF
+
+echo "  Pre-flight passed."
+
+# ── Build package manifest ────────────────────────────────────────────────────
 PACKAGE_LIST="${PROV_DIR}/package_manifest.txt"
 CURRENT_RUNS_LIST="${PROV_DIR}/current_stage2_run_dirs.txt"
 : > "${PACKAGE_LIST}"
 : > "${CURRENT_RUNS_LIST}"
 
+# Fixed directories
 for d in \
     "reports/stage2_multiseed_analysis" \
     "reports/chembl_stage2_multiseed_analysis" \
@@ -48,12 +128,13 @@ for d in \
     "configs/chembl_stage2_multiseed"; do
     if [[ -d "${d}" ]]; then
         echo "${d}" >> "${PACKAGE_LIST}"
-        echo "  including: ${d}"
+        echo "  queued: ${d}"
     else
-        echo "  skipping (not found): ${d}"
+        echo "  WARNING skipping (not found): ${d}"
     fi
 done
 
+# Run directories from manifests
 python - <<'PYEOF'
 from pathlib import Path
 import pandas as pd
@@ -70,21 +151,22 @@ for manifest_path in manifest_paths:
     if not manifest_path.exists():
         continue
     df = pd.read_csv(manifest_path)
-    if "config_stem" in df.columns:
-        latest_by_config = {}
-        for _, row in df.iterrows():
-            latest_by_config[str(row["config_stem"])] = str(row["run_dir"])
-        run_dirs.extend(latest_by_config.values())
-    else:
-        run_dirs.extend(df["run_dir"].astype(str).tolist())
+    latest = {}
+    for _, row in df.iterrows():
+        latest[str(row["config_stem"])] = str(row["run_dir"])
+    run_dirs.extend(latest.values())
 
 unique_run_dirs = sorted(set(run_dirs))
 existing = package_list.read_text()
 package_list.write_text(existing + "\n".join(unique_run_dirs) + "\n")
 current_runs_list.write_text("\n".join(unique_run_dirs) + ("\n" if unique_run_dirs else ""))
 for run_dir in unique_run_dirs:
-    print(f"  including run dir: {run_dir}")
+    print(f"  queued run dir: {run_dir}")
 PYEOF
+
+# ── Copy to export directory ──────────────────────────────────────────────────
+echo ""
+echo "  Copying to export directory..."
 
 EXPORT_DIR="${EXPORT_DIR}" ARCHIVE_DIR="${ARCHIVE_DIR}" ARCHIVE_ROOT="${ARCHIVE_ROOT}" python - <<'PYEOF'
 from pathlib import Path
@@ -101,26 +183,28 @@ runs_root = Path("reports/runs").resolve()
 sources = [Path(line.strip()) for line in package_list.read_text().splitlines() if line.strip()]
 export_dir.mkdir(parents=True, exist_ok=True)
 
+copied = 0
 for src in sources:
     if not src.exists():
-        print(f"  export skip (not found): {src}")
-        continue
-
+        # Already caught by pre-flight; log and abort rather than silently skip
+        raise RuntimeError(f"Source vanished after pre-flight: {src}")
     dest = export_dir / src
     if src.is_dir():
         shutil.copytree(src, dest, dirs_exist_ok=True)
     else:
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dest)
-    print(f"  exported: {src} -> {dest}")
+    copied += 1
 
+print(f"  Copied {copied} items to {export_dir}")
+
+# Archive redundant run dirs (old runs not in the current manifest)
 keep_run_dirs = {
     Path(line.strip()).resolve()
     for line in current_runs_list.read_text().splitlines()
     if line.strip()
 }
 if not keep_run_dirs:
-    print("  archive skip: no current manifest-selected Stage 2 run dirs found.")
     raise SystemExit(0)
 
 candidate_run_dirs = []
@@ -134,34 +218,46 @@ for path in runs_root.iterdir():
         continue
     candidate_run_dirs.append(resolved)
 
-redundant_run_dirs = sorted(path for path in candidate_run_dirs if path not in keep_run_dirs)
-if not redundant_run_dirs:
-    print("  archive skip: no redundant Stage 2 run dirs found.")
+redundant = sorted(path for path in candidate_run_dirs if path not in keep_run_dirs)
+if not redundant:
+    print("  No redundant run dirs to archive.")
     raise SystemExit(0)
 
 archive_dir.mkdir(parents=True, exist_ok=True)
-for src in redundant_run_dirs:
+for src in redundant:
     dest = archive_dir / src.name
-    if dest.exists():
-        raise SystemExit(f"Archive destination already exists: {dest}")
     shutil.move(str(src), str(dest))
-    print(f"  archived redundant run dir: {src} -> {dest}")
+    print(f"  Archived redundant: {src.name}")
 PYEOF
 
+# ── Tar and summarise ─────────────────────────────────────────────────────────
 if [[ ! -s "${PACKAGE_LIST}" ]]; then
-    echo "ERROR: nothing to package. Run steps 03-06 first." >&2
+    echo "ERROR: package manifest is empty. Run steps 03-06 first." >&2
     exit 1
 fi
 
 tar -czf "${ARCHIVE_NAME}" -C "${EXPORT_ROOT}" "$(basename "${EXPORT_DIR}")"
 
+ARCHIVE_SIZE="$(du -sh "${ARCHIVE_NAME}" | cut -f1)"
+RUN_DIR_COUNT="$(wc -l < "${CURRENT_RUNS_LIST}" | tr -d ' ')"
+
 echo ""
-echo "  Export dir: ${EXPORT_DIR}"
-echo "  Archived redundant run dirs under: ${ARCHIVE_DIR}"
-echo "  Archive: ${ARCHIVE_NAME}"
-echo "  Size:    $(du -sh "${ARCHIVE_NAME}" | cut -f1)"
+echo "=== Export complete ==="
+echo ""
+echo "  Contents:"
+echo "    ${RUN_DIR_COUNT} Stage 2 run dirs (each with predictions + tables + models)"
+echo "    Analysis CSVs: stage2_ad_bins_raw, stage2_ad_bins_aggregated, stage2_run_manifest"
+echo "    Cross-model comparison: cross_model_summary.csv"
+echo "    Configs: configs/stage2_multiseed/, configs/chembl_stage2_multiseed/"
+echo "    Provenance: git hash, pip freeze, GPU info"
+echo ""
+echo "  Export dir : ${EXPORT_DIR}"
+echo "  Archive    : ${ARCHIVE_NAME}  (${ARCHIVE_SIZE})"
 echo ""
 echo "Download with:"
 echo "  scp -P <PORT> root@<HOST>:$(pwd)/${ARCHIVE_NAME} ."
-echo "  scp -r -P <PORT> root@<HOST>:$(pwd)/${EXPORT_DIR} ./reports/"
+echo ""
+echo "Then locally:"
+echo "  mkdir -p reports && tar -xzf ${ARCHIVE_NAME} --strip-components=2 -C reports"
+echo ""
 echo "=== 07 Complete ==="

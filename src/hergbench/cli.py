@@ -311,5 +311,133 @@ def build_panel(
     typer.echo(f"\nPanel saved to: {out_path}  (n={len(panel)})")
 
 
+@app.command()
+def calibrate_stage2(
+    dataset: str = typer.Option(
+        "both",
+        "--dataset",
+        "-d",
+        help="Dataset to calibrate: 'tdc', 'chembl', or 'both'.",
+    ),
+    method: str = typer.Option(
+        "auto",
+        "--method",
+        "-m",
+        help=(
+            "Calibration method: 'auto' (sigmoid for cluster, isotonic for random/scaffold),"
+            " 'sigmoid' (Platt), or 'isotonic'."
+        ),
+    ),
+    manifest_path: Optional[Path] = typer.Option(
+        None,
+        "--manifest-path",
+        help="Path to stage2_run_manifest.csv. Auto-resolved from dataset if omitted.",
+    ),
+    repo_root: Optional[Path] = typer.Option(
+        None,
+        "--repo-root",
+        help="Repo root for resolving relative run_dir paths in the manifest. Defaults to cwd.",
+    ),
+    output_dir: Optional[Path] = typer.Option(
+        None,
+        "--output-dir",
+        "-o",
+        help="Output directory for calibrated CSVs. Auto-resolved from dataset if omitted.",
+    ),
+    skip_existing: bool = typer.Option(
+        True,
+        "--skip-existing/--no-skip-existing",
+        help="Use cached calibrated raw CSV if it already exists.",
+    ),
+    fallback_to_raw: bool = typer.Option(
+        True,
+        "--fallback-to-raw/--no-fallback-to-raw",
+        help=(
+            "When run dirs are missing (e.g. runs were on a remote pod), fall back to "
+            "the uncalibrated raw CSV so downstream figures can still render."
+        ),
+    ),
+) -> None:
+    """Post-hoc calibrate Stage 2 D-MPNN runs to match Stage 1 calibration.
+
+    Reads raw prediction probabilities from completed Stage 2 run directories,
+    fits a calibrator on each run's validation set, and re-evaluates metrics
+    across applicability-domain similarity bins.
+
+    Writes two artefacts per dataset:
+      reports/{dataset}_stage2_multiseed_analysis/stage2_ad_bins_calibrated_raw.csv
+      reports/{dataset}_stage2_multiseed_analysis/stage2_ad_bins_calibrated_aggregated.csv
+    """
+    from hergbench.analysis.calibrate_stage2 import calibrate_all_stage2_runs
+
+    datasets = ["tdc", "chembl"] if dataset == "both" else [dataset]
+    if dataset not in ("tdc", "chembl", "both"):
+        raise typer.BadParameter(
+            f"Invalid dataset '{dataset}'. Choose from: tdc, chembl, both.",
+            param_hint="--dataset",
+        )
+
+    for ds in datasets:
+        typer.echo(f"\n[calibrate-stage2] dataset={ds}  method={method}")
+        agg_df = calibrate_all_stage2_runs(
+            dataset=ds,
+            manifest_path=manifest_path,
+            method=method,
+            repo_root=repo_root,
+            output_dir=output_dir,
+            skip_existing=skip_existing,
+            fallback_to_raw=fallback_to_raw,
+        )
+        if agg_df.empty:
+            typer.echo(f"  WARNING: no calibrated rows produced for {ds}.")
+        else:
+            typer.echo(f"  Done. Aggregated {len(agg_df)} rows.")
+
+
+@app.command()
+def generate_figures(
+    output_dir: Path = typer.Option(
+        Path("reports/paper_figures"),
+        "--output-dir",
+        "-o",
+        help="Directory to write PNG and PDF figure files.",
+    ),
+    dataset: str = typer.Option(
+        "both",
+        "--dataset",
+        "-d",
+        help="Dataset to include: 'tdc', 'chembl', or 'both'.",
+    ),
+    dpi: int = typer.Option(300, "--dpi", help="Resolution for PNG output (default 300)."),
+) -> None:
+    """Generate publication figures from Stage 2 benchmark results.
+
+    Reads aggregated AD-bin CSVs and cross-model comparison data from the
+    reports directory and writes five figure files to OUTPUT_DIR:
+
+    \b
+      fig1_gradient_6panel.*         — AUROC/Brier by dataset × split ±1σ bands
+      fig2_reliability_by_bin.*      — Reliability diagrams per sim-bin
+      fig3_probability_collapse.*    — Silent failure panel (TDC cluster XGBoost)
+      fig4_cross_model_comparison.*  — Grouped dot plot D-MPNN vs XGBoost
+      fig5_calibration_effect.*      — Brier before/after calibration
+    """
+    try:
+        from hergbench.analysis.paper_figures import generate_all_figures
+    except ImportError as exc:
+        raise typer.BadParameter(
+            f"paper_figures module not available: {exc}. "
+            "Ensure matplotlib is installed.",
+            param_hint="generate-figures",
+        ) from exc
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    datasets = ["tdc", "chembl"] if dataset == "both" else [dataset]
+    generate_all_figures(datasets=datasets, output_dir=output_dir, dpi=dpi)
+    typer.echo(f"Figures written to: {output_dir}")
+
+
 if __name__ == "__main__":
     app()
