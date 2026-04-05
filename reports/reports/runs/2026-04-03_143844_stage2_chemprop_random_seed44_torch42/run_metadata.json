@@ -1,0 +1,43 @@
+{
+  "stage": 2,
+  "split_type": "random",
+  "dataset_path": "data/chembl/processed/chembl_herg_clean.csv",
+  "dataset_sha256": "564d35523fc74647adfe8d1c83478b7699c307efe010be1b2772fd5a6f102591",
+  "membership_path": "data/chembl/splits/random_seed44.csv",
+  "train_config": {
+    "data_path": "reports/runs/2026-04-03_143844_stage2_chemprop_random_seed44_torch42/chemprop_input.csv",
+    "output_dir": "reports/runs/2026-04-03_143844_stage2_chemprop_random_seed44_torch42/models/chemprop_dmnn",
+    "smiles_col": "smiles",
+    "target_col": "y",
+    "task_type": "classification",
+    "metrics": [
+      "prc",
+      "roc"
+    ],
+    "tracking_metric": "auroc",
+    "epochs": 80,
+    "patience": 10,
+    "batch_size": 64,
+    "num_workers": 4,
+    "message_hidden_dim": 300,
+    "depth": 3,
+    "dropout": 0.0,
+    "init_lr": 0.0001,
+    "max_lr": 0.001,
+    "final_lr": 0.0001,
+    "warmup_epochs": 2,
+    "data_seed": 42,
+    "pytorch_seed": 42,
+    "accelerator": "cuda",
+    "devices": "1"
+  },
+  "postprocess": {
+    "calibration_method": "none",
+    "threshold_metric": "youden",
+    "ad_bins": [
+      0.3,
+      0.5,
+      0.7
+    ]
+  }
+}

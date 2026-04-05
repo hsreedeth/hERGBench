@@ -1,0 +1,15 @@
+9d4be2b7c17b1170ad1ce7938a05d0f27354212f
+ .../stage2_ad_bins_aggregated.csv                  | 24 +++++------
+ .../cross_model_comparison/cross_model_ad_bins.csv | 48 +++++++++++-----------
+ .../cross_model_comparison/cross_model_summary.csv | 12 +++---
+ .../cross_model_summary_macro.csv                  | 12 +++---
+ .../stage2_ad_bins_aggregated.csv                  | 24 +++++------
+ reports/stage2_provenance/git_commit.txt           | 22 +---------
+ reports/stage2_provenance/gpu_info.txt             |  2 +-
+ reports/stage2_provenance/package_manifest.txt     | 46 +++++++--------------
+ reports/stage2_provenance/pip_freeze.txt           |  6 +--
+ .../stage2_ad_bins_aggregated.csv                  | 24 +++++------
+ src/hergbench_tdc.egg-info/PKG-INFO                |  2 +-
+ src/hergbench_tdc.egg-info/SOURCES.txt             | 23 ++++++++++-
+ src/hergbench_tdc.egg-info/requires.txt            |  2 +-
+ 13 files changed, 116 insertions(+), 131 deletions(-)

@@ -1,0 +1,6 @@
+{
+  "purpose": "chembl_stage2_multiseed_analysis",
+  "dataset": "chembl",
+  "created": "2026-04-03T13:23:19.675943",
+  "note": "ChEMBL Stage 2 only. TDC results are under reports/stage2_tdc_import/"
+}
