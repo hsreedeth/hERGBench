@@ -17,7 +17,7 @@ fonttools==4.62.1
 frozenlist==1.8.0
 fsspec==2026.2.0
 hergbench==0.1.0
--e git+https://github.com/hsreedeth/hERGBench.git@558d55a41f120031a6ab5b89e65b43a652bcc647#egg=hergbench_tdc
+-e git+https://github.com/hsreedeth/hERGBench.git@47bd9b90965434f7d19775f67ecda1d808f175ae#egg=hergbench_tdc
 idna==3.11
 Jinja2==3.1.6
 joblib==1.5.3
@@ -52,7 +52,7 @@ packaging==26.0
 padelpy==0.1.16
 pandas==2.3.3
 pandas-flavor==0.8.1
-pillow==12.1.1
+pillow==12.2.0
 propcache==0.4.1
 psutil==7.2.2
 Pygments==2.20.0
@@ -78,6 +78,6 @@ tqdm==4.67.3
 triton==3.2.0
 typer==0.24.1
 typing_extensions==4.15.0
-tzdata==2025.3
+tzdata==2026.1
 xarray==2026.2.0
 yarl==1.23.0

@@ -1,21 +1,17 @@
-558d55a41f120031a6ab5b89e65b43a652bcc647
- .../stage2_chemprop_cluster_seed11_torch11.yaml    |   2 +-
- .../stage2_chemprop_cluster_seed11_torch22.yaml    |   2 +-
- .../stage2_chemprop_cluster_seed11_torch33.yaml    |   2 +-
- .../stage2_chemprop_cluster_seed11_torch44.yaml    |   2 +-
- .../stage2_chemprop_cluster_seed11_torch55.yaml    |   2 +-
- .../stage2_chemprop_random_seed11_torch11.yaml     |   2 +-
- .../stage2_chemprop_random_seed11_torch22.yaml     |   2 +-
- .../stage2_chemprop_random_seed11_torch33.yaml     |   2 +-
- .../stage2_chemprop_random_seed11_torch44.yaml     |   2 +-
- .../stage2_chemprop_random_seed11_torch55.yaml     |   2 +-
- .../stage2_chemprop_scaffold_seed11_torch11.yaml   |   2 +-
- .../stage2_chemprop_scaffold_seed11_torch22.yaml   |   2 +-
- .../stage2_chemprop_scaffold_seed11_torch33.yaml   |   2 +-
- .../stage2_chemprop_scaffold_seed11_torch44.yaml   |   2 +-
- .../stage2_chemprop_scaffold_seed11_torch55.yaml   |   2 +-
- hERGBench_Stage2_Cluster_None_MultiTorch_v1.tar.gz | Bin 355858 -> 0 bytes
+47bd9b90965434f7d19775f67ecda1d808f175ae
+ .../stage2_ad_bins_aggregated.csv                  |  24 ++---
+ .../cross_model_comparison/cross_model_ad_bins.csv |  48 ++++-----
+ .../cross_model_comparison/cross_model_summary.csv |  12 +--
+ .../cross_model_summary_macro.csv                  |  12 +--
+ .../stage2_ad_bins_aggregated.csv                  |  24 ++---
+ .../stage2_ad_bins_raw.csv                         | 120 ++++++++++-----------
+ .../stage2_run_manifest.csv                        |  30 +++---
+ reports/stage2_provenance/git_commit.txt           |  22 +---
+ reports/stage2_provenance/gpu_info.txt             |   2 +-
+ reports/stage2_provenance/package_manifest.txt     |  61 ++++++-----
+ reports/stage2_provenance/pip_freeze.txt           |   6 +-
+ .../stage2_ad_bins_aggregated.csv                  |  24 ++---
  src/hergbench_tdc.egg-info/PKG-INFO                |   2 +-
- src/hergbench_tdc.egg-info/SOURCES.txt             |  22 ++++++++++++++++++++-
+ src/hergbench_tdc.egg-info/SOURCES.txt             |  23 +++-
  src/hergbench_tdc.egg-info/requires.txt            |   2 +-
- 19 files changed, 38 insertions(+), 18 deletions(-)
+ 15 files changed, 206 insertions(+), 206 deletions(-)

@@ -586,6 +586,7 @@ def generate_all_figures(
     datasets: Optional[list[str]] = None,
     output_dir: Path = Path("reports/paper_figures"),
     repo_root: Optional[Path] = None,
+    figures: Optional[list[str]] = None,
     dpi: int = 300,
 ) -> None:
     """Generate all five publication figures.
@@ -595,10 +596,13 @@ def generate_all_figures(
     datasets : list of "tdc" and/or "chembl". Defaults to both.
     output_dir : directory to write PNG + PDF files.
     repo_root : repository root. Defaults to cwd.
+    figures : subset of figure IDs to render ("fig1"..."fig5"). Defaults to all.
     dpi : output resolution for PNG files (default 300).
     """
     if datasets is None:
         datasets = ["tdc", "chembl"]
+    if figures is None:
+        figures = ["fig1", "fig2", "fig3", "fig4", "fig5"]
     if repo_root is None:
         repo_root = Path.cwd()
 
@@ -608,42 +612,47 @@ def generate_all_figures(
     import matplotlib
     matplotlib.use("Agg")  # non-interactive backend for script use
 
-    logger.info("Generating fig1_gradient_6panel ...")
-    try:
-        fig_gradient_6panel(datasets=datasets, output_dir=output_dir, repo_root=repo_root, dpi=dpi)
-    except Exception as exc:
-        logger.error("fig1 failed: %s", exc, exc_info=True)
+    if "fig1" in figures:
+        logger.info("Generating fig1_gradient_6panel ...")
+        try:
+            fig_gradient_6panel(datasets=datasets, output_dir=output_dir, repo_root=repo_root, dpi=dpi)
+        except Exception as exc:
+            logger.error("fig1 failed: %s", exc, exc_info=True)
 
-    logger.info("Generating fig2_reliability_by_bin ...")
-    try:
-        fig_reliability_by_bin(
-            output_dir=output_dir, repo_root=repo_root,
-            dataset="chembl", split_type="scaffold", dpi=dpi,
-        )
-    except Exception as exc:
-        logger.error("fig2 failed: %s", exc, exc_info=True)
+    if "fig2" in figures:
+        logger.info("Generating fig2_reliability_by_bin ...")
+        try:
+            fig_reliability_by_bin(
+                output_dir=output_dir, repo_root=repo_root,
+                dataset="chembl", split_type="scaffold", dpi=dpi,
+            )
+        except Exception as exc:
+            logger.error("fig2 failed: %s", exc, exc_info=True)
 
-    logger.info("Generating fig3_ad_performance_split ...")
-    try:
-        fig_ad_performance_split(
-            output_dir=output_dir, repo_root=repo_root,
-            dataset="tdc", split_type="cluster", dpi=dpi,
-        )
-    except Exception as exc:
-        logger.error("fig3 failed: %s", exc, exc_info=True)
+    if "fig3" in figures:
+        logger.info("Generating fig3_ad_performance_split ...")
+        try:
+            fig_ad_performance_split(
+                output_dir=output_dir, repo_root=repo_root,
+                dataset="tdc", split_type="cluster", dpi=dpi,
+            )
+        except Exception as exc:
+            logger.error("fig3 failed: %s", exc, exc_info=True)
 
-    logger.info("Generating fig4_cross_model_comparison ...")
-    try:
-        fig_cross_model_comparison(output_dir=output_dir, repo_root=repo_root, dpi=dpi)
-    except Exception as exc:
-        logger.error("fig4 failed: %s", exc, exc_info=True)
+    if "fig4" in figures:
+        logger.info("Generating fig4_cross_model_comparison ...")
+        try:
+            fig_cross_model_comparison(output_dir=output_dir, repo_root=repo_root, dpi=dpi)
+        except Exception as exc:
+            logger.error("fig4 failed: %s", exc, exc_info=True)
 
-    logger.info("Generating fig5_calibration_effect ...")
-    try:
-        fig_calibration_effect(
-            datasets=datasets, output_dir=output_dir, repo_root=repo_root, dpi=dpi,
-        )
-    except Exception as exc:
-        logger.error("fig5 failed: %s", exc, exc_info=True)
+    if "fig5" in figures:
+        logger.info("Generating fig5_calibration_effect ...")
+        try:
+            fig_calibration_effect(
+                datasets=datasets, output_dir=output_dir, repo_root=repo_root, dpi=dpi,
+            )
+        except Exception as exc:
+            logger.error("fig5 failed: %s", exc, exc_info=True)
 
     logger.info("All figures written to %s", output_dir)

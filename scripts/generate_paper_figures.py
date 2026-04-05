@@ -4,6 +4,7 @@
 Run from repo root:
   python scripts/generate_paper_figures.py
   python scripts/generate_paper_figures.py --datasets tdc chembl --dpi 300
+  python scripts/generate_paper_figures.py --datasets chembl --figures fig1
   python scripts/generate_paper_figures.py --output-dir reports/paper_figures
 
 Prerequisites
@@ -59,6 +60,14 @@ def main() -> int:
         help="PNG resolution (default 300 for publication).",
     )
     parser.add_argument(
+        "--figures",
+        nargs="+",
+        default=["all"],
+        choices=["all", "fig1", "fig2", "fig3", "fig4", "fig5"],
+        metavar="FIGURE",
+        help="Subset of figures to generate. Use 'all' or one/more of fig1-fig5.",
+    )
+    parser.add_argument(
         "--repo-root",
         default=None,
         help="Repo root directory. Auto-detected if omitted.",
@@ -71,6 +80,8 @@ def main() -> int:
     logger.info("repo_root  : %s", repo_root)
     logger.info("output_dir : %s", output_dir)
     logger.info("datasets   : %s", args.datasets)
+    figures = ["fig1", "fig2", "fig3", "fig4", "fig5"] if "all" in args.figures else args.figures
+    logger.info("figures    : %s", figures)
     logger.info("dpi        : %d", args.dpi)
 
     try:
@@ -84,6 +95,7 @@ def main() -> int:
         datasets=args.datasets,
         output_dir=output_dir,
         repo_root=repo_root,
+        figures=figures,
         dpi=args.dpi,
     )
 
