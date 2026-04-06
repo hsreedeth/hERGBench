@@ -15,6 +15,7 @@ __pycache__/
 # data/processed
 reports/runs
 reports/lead_reports
+reports/analysis/probability_compression
 
 # OS
 .DS_Store
