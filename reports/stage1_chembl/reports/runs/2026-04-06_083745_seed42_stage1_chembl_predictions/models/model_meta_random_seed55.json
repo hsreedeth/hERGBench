@@ -1,0 +1,21 @@
+{
+  "split_type": "random",
+  "seed": 55,
+  "best_val_score": 0.9263206221294672,
+  "best_params": {
+    "learning_rate": 0.1985062911537174,
+    "max_depth": 8,
+    "min_child_weight": 3.416037430310328,
+    "subsample": 0.6071847502459279,
+    "colsample_bytree": 0.9016552640704525,
+    "reg_alpha": 5.936124626948496e-05,
+    "reg_lambda": 4.3444691085504115,
+    "gamma": 0.05557192411355638
+  },
+  "scale_pos_weight": 0.4278023457027495,
+  "calibration": {
+    "method": "isotonic",
+    "threshold_metric": "youden",
+    "threshold": 0.64
+  }
+}

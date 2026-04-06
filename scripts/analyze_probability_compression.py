@@ -142,6 +142,18 @@ def parse_torch_seed(run_name: str) -> Optional[str]:
     return match.group(1) if match else None
 
 
+def infer_stage1_dataset(meta: dict, run_dir: Path) -> str:
+    config = meta.get("config", {}) if isinstance(meta, dict) else {}
+    paths = config.get("paths", {}) if isinstance(config, dict) else {}
+    for key in ("data_processed", "data_raw", "data_splits"):
+        inferred = infer_dataset_from_path(paths.get(key))
+        if inferred == "chembl":
+            return "chembl"
+    if "stage1_chembl" in str(run_dir):
+        return "chembl"
+    return "tdc"
+
+
 def canonical_test_pred_files(pred_dir: Path) -> list[Path]:
     files = []
     for path in sorted(pred_dir.glob("test_preds_*_with_sim.csv")):
@@ -170,13 +182,33 @@ def derive_similarity_bin(sim_values: pd.Series) -> pd.Series:
     ).astype(str)
 
 
-def choose_stage1_xgboost_runset(repo_root: Path) -> tuple[Optional[Path], list[PredictionSource], str]:
-    runs_root = repo_root / "reports" / "runs"
+def iter_stage1_run_dirs(repo_root: Path) -> list[Path]:
+    reports_root = repo_root / "reports"
+    if not reports_root.exists():
+        return []
+
+    run_dirs: list[Path] = []
+    seen: set[Path] = set()
+    for run_dir in reports_root.rglob("*stage1*"):
+        if not run_dir.is_dir():
+            continue
+        if (run_dir / "metadata.json").exists() and (run_dir / "predictions").exists():
+            resolved = run_dir.resolve()
+            if resolved not in seen:
+                seen.add(resolved)
+                run_dirs.append(run_dir)
+    return sorted(run_dirs)
+
+
+def choose_stage1_xgboost_runset(repo_root: Path, dataset: str) -> tuple[Optional[Path], list[PredictionSource], str]:
     candidates: list[tuple[int, int, str, Path, list[Path]]] = []
-    for run_dir in sorted(runs_root.glob("*stage1*")):
+    for run_dir in iter_stage1_run_dirs(repo_root):
         pred_dir = run_dir / "predictions"
         meta_path = run_dir / "metadata.json"
         if not pred_dir.exists() or not meta_path.exists():
+            continue
+        meta = read_json(meta_path)
+        if infer_stage1_dataset(meta, run_dir) != dataset:
             continue
         files = canonical_test_pred_files(pred_dir)
         if not files:
@@ -185,18 +217,26 @@ def choose_stage1_xgboost_runset(repo_root: Path) -> tuple[Optional[Path], list[
         candidates.append((len(files), style_priority, run_dir.name, run_dir, files))
 
     if not candidates:
-        return None, [], "No Stage 1 XGBoost run set with canonical test prediction CSVs was found."
+        return None, [], f"No Stage 1 XGBoost run set with canonical test prediction CSVs was found for dataset={dataset}."
 
     candidates.sort(key=lambda item: (item[0], item[1], item[2]), reverse=True)
     _, _, _, chosen_run_dir, chosen_files = candidates[0]
 
-    reason = (
-        "Selected the highest-coverage canonical Stage 1 XGBoost run set "
-        f"({len(chosen_files)} prediction files) from {chosen_run_dir.name}. "
-        "Coverage was prioritized ahead of run label because the checked-in "
-        "signoff runs only contain seed11 predictions, whereas the selected "
-        "MVP run provides all 3 splits x 5 split seeds."
-    )
+    dataset_label = "ChEMBL" if dataset == "chembl" else "TDC"
+    if dataset == "tdc":
+        reason = (
+            "Selected the highest-coverage canonical Stage 1 XGBoost run set "
+            f"for {dataset_label} ({len(chosen_files)} prediction files) from {chosen_run_dir.name}. "
+            "Coverage was prioritized ahead of run label because the checked-in "
+            "signoff runs only contain seed11 predictions, whereas the selected "
+            "MVP run provides all 3 splits x 5 split seeds."
+        )
+    else:
+        reason = (
+            "Selected the highest-coverage canonical Stage 1 XGBoost run set "
+            f"for {dataset_label} ({len(chosen_files)} prediction files) from "
+            f"{chosen_run_dir.relative_to(repo_root)}."
+        )
 
     sources = []
     for pred_file in chosen_files:
@@ -206,7 +246,7 @@ def choose_stage1_xgboost_runset(repo_root: Path) -> tuple[Optional[Path], list[
         split_type, split_seed = split_match.groups()
         sources.append(
             PredictionSource(
-                dataset="tdc",
+                dataset=dataset,
                 model="xgboost",
                 split_type=split_type,
                 seed_label=split_seed,
@@ -288,12 +328,17 @@ def discover_sources(repo_root: Path, dataset_arg: str) -> tuple[list[Prediction
         sources.extend(chembl_sources)
         notes.append(note)
 
+        _, chembl_xgb_sources, chembl_xgb_note = choose_stage1_xgboost_runset(repo_root, "chembl")
+        if chembl_xgb_sources:
+            sources.extend(chembl_xgb_sources)
+        notes.append(chembl_xgb_note)
+
     if "tdc" in datasets:
         tdc_stage2_sources, note = discover_stage2_manifest_sources(repo_root, "tdc")
         sources.extend(tdc_stage2_sources)
         notes.append(note)
 
-        chosen_run_dir, xgb_sources, xgb_note = choose_stage1_xgboost_runset(repo_root)
+        _, xgb_sources, xgb_note = choose_stage1_xgboost_runset(repo_root, "tdc")
         if xgb_sources:
             sources.extend(xgb_sources)
         notes.append(xgb_note)
@@ -845,17 +890,20 @@ def classify_signal(dataset: str, master_df: pd.DataFrame) -> str:
 
     cluster_dr = float(xgb_cluster_row["dynamic_range"])
     cluster_gap = float(xgb_cluster_row["label_gap"])
+    cluster_iqr = float(xgb_cluster_row["iqr"])
     other_dr = float(xgb_other["dynamic_range"].min()) if not xgb_other.empty else float("nan")
     dmpnn_dr = float(dmpnn_cluster_row["dynamic_range"]) if dmpnn_cluster_row is not None and str(dmpnn_cluster_row["status"]) == "available" else float("nan")
+    dmpnn_iqr = float(dmpnn_cluster_row["iqr"]) if dmpnn_cluster_row is not None and str(dmpnn_cluster_row["status"]) == "available" else float("nan")
 
     severe_overlap = not math.isnan(cluster_gap) and cluster_gap < 0.08
     very_narrow = not math.isnan(cluster_dr) and cluster_dr < 0.10
     narrower_than_dmpnn = not math.isnan(dmpnn_dr) and cluster_dr < 0.60 * dmpnn_dr
-    narrower_than_other_xgb = not math.isnan(other_dr) and cluster_dr < 0.70 * other_dr
+    materially_narrower_than_dmpnn = not math.isnan(dmpnn_iqr) and cluster_iqr < 0.60 * dmpnn_iqr
+    narrower_than_other_xgb = not math.isnan(other_dr) and cluster_dr < 0.80 * other_dr
 
     if very_narrow and severe_overlap:
         return "Probability collapse supported: XGBoost cluster predictions occupy a very narrow range with limited positive/negative separation."
-    if narrower_than_dmpnn and narrower_than_other_xgb:
+    if (narrower_than_dmpnn or materially_narrower_than_dmpnn) and narrower_than_other_xgb:
         return "Probability compression supported: XGBoost cluster predictions are materially narrower than both D-MPNN cluster predictions and XGBoost random/scaffold predictions."
     return "No clear compression signal."
 
@@ -889,9 +937,18 @@ def write_dataset_readme(
         "- Pooled summaries combine all selected seed-level prediction files for a given dataset x split x model combination.",
     ]
     if dataset == "chembl":
-        assumption_lines.append(
-            "- No per-test ChEMBL Stage 1 XGBoost prediction CSVs were found in the checked-in repo; ChEMBL XGBoost rows are therefore marked missing rather than back-filled from aggregate summaries."
+        has_chembl_xgb = (
+            not ds_sources.empty
+            and ((ds_sources["dataset"] == "chembl") & (ds_sources["model"] == "xgboost")).any()
         )
+        if has_chembl_xgb:
+            assumption_lines.append(
+                "- ChEMBL Stage 1 XGBoost per-test prediction CSVs were loaded from the imported `reports/stage1_chembl` artifact bundle rather than inferred from aggregate summaries."
+            )
+        else:
+            assumption_lines.append(
+                "- No per-test ChEMBL Stage 1 XGBoost prediction CSVs were found in the checked-in repo; ChEMBL XGBoost rows are therefore marked missing rather than back-filled from aggregate summaries."
+            )
 
     key_rows = ds_master[["split_type", "model_label", "status", "n", "dynamic_range", "iqr", "label_gap"]].copy()
     key_rows["split_type"] = key_rows["split_type"].astype(str).map(SPLIT_LABELS)

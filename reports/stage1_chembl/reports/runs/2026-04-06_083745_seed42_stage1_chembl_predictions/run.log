@@ -1,0 +1,58 @@
+[2026-04-06 08:37:45,965] INFO - Starting Stage 1 run: 2026-04-06_083745_seed42_stage1_chembl_predictions
+[2026-04-06 08:37:45,966] INFO - Global seed set to 42
+[2026-04-06 08:37:49,289] INFO - Wrote run metadata and resolved config
+[2026-04-06 08:38:05,168] INFO - Loaded processed dataset from data/chembl/processed/herg_clean.csv (9283 rows)
+[2026-04-06 08:38:07,787] INFO - Stage1: split=random seed=11
+[2026-04-06 08:38:07,846] INFO - scale_pos_weight=0.428 (train pos=5201 neg=2225)
+[2026-04-06 08:41:02,172] INFO - Best val aucpr=0.9299 with params={'learning_rate': 0.23020919308550314, 'max_depth': 8, 'min_child_weight': 1.2568672294227032, 'subsample': 0.6071847502459279, 'colsample_bytree': 0.8262452362725613, 'reg_alpha': 6.939306313411693e-05, 'reg_lambda': 4.3444691085504115, 'gamma': 0.05926297805822667}
+[2026-04-06 08:41:05,094] INFO - Stage1: split=random seed=22
+[2026-04-06 08:41:05,150] INFO - scale_pos_weight=0.428 (train pos=5201 neg=2225)
+[2026-04-06 08:44:23,901] INFO - Best val aucpr=0.9385 with params={'learning_rate': 0.03817978349804, 'max_depth': 10, 'min_child_weight': 5.474345168154976, 'subsample': 0.7407842506326847, 'colsample_bytree': 0.8273119754685928, 'reg_alpha': 7.284552750046396e-08, 'reg_lambda': 0.20654894020766282, 'gamma': 0.7993614788711384}
+[2026-04-06 08:44:29,519] INFO - Stage1: split=random seed=33
+[2026-04-06 08:44:29,542] INFO - scale_pos_weight=0.428 (train pos=5201 neg=2225)
+[2026-04-06 08:47:41,634] INFO - Best val aucpr=0.9428 with params={'learning_rate': 0.11561457547227869, 'max_depth': 9, 'min_child_weight': 2.0206266986620194, 'subsample': 0.6754501462686379, 'colsample_bytree': 0.8988425427851944, 'reg_alpha': 4.226079757213458e-06, 'reg_lambda': 6.575004943164608e-08, 'gamma': 1.0017281183057476}
+[2026-04-06 08:47:45,494] INFO - Stage1: split=random seed=44
+[2026-04-06 08:47:45,532] INFO - scale_pos_weight=0.428 (train pos=5201 neg=2225)
+[2026-04-06 08:51:05,009] INFO - Best val aucpr=0.9427 with params={'learning_rate': 0.05531141548295794, 'max_depth': 10, 'min_child_weight': 1.0582674833790713, 'subsample': 0.7498915001542623, 'colsample_bytree': 0.6995587632445829, 'reg_alpha': 1.017525980031853e-06, 'reg_lambda': 0.00017529469774933421, 'gamma': 1.0694542946914427}
+[2026-04-06 08:51:08,559] INFO - Stage1: split=random seed=55
+[2026-04-06 08:51:08,588] INFO - scale_pos_weight=0.428 (train pos=5201 neg=2225)
+[2026-04-06 08:53:24,501] INFO - Best val aucpr=0.9263 with params={'learning_rate': 0.1985062911537174, 'max_depth': 8, 'min_child_weight': 3.416037430310328, 'subsample': 0.6071847502459279, 'colsample_bytree': 0.9016552640704525, 'reg_alpha': 5.936124626948496e-05, 'reg_lambda': 4.3444691085504115, 'gamma': 0.05557192411355638}
+[2026-04-06 08:53:27,252] INFO - Stage1: split=scaffold seed=11
+[2026-04-06 08:53:27,278] INFO - scale_pos_weight=0.419 (train pos=5235 neg=2191)
+[2026-04-06 08:55:26,797] INFO - Best val aucpr=0.9034 with params={'learning_rate': 0.15163518210894233, 'max_depth': 9, 'min_child_weight': 1.839297908944332, 'subsample': 0.7649011048051568, 'colsample_bytree': 0.9604556214650001, 'reg_alpha': 9.161328889134704e-06, 'reg_lambda': 1.1150674573075396, 'gamma': 0.03131636597914564}
+[2026-04-06 08:55:28,886] INFO - Stage1: split=scaffold seed=22
+[2026-04-06 08:55:28,911] INFO - scale_pos_weight=0.420 (train pos=5229 neg=2197)
+[2026-04-06 08:57:50,241] INFO - Best val aucpr=0.8778 with params={'learning_rate': 0.21096527010428454, 'max_depth': 7, 'min_child_weight': 2.3074002626503094, 'subsample': 0.6510608818480068, 'colsample_bytree': 0.8124833840471865, 'reg_alpha': 1.5164090807715877e-05, 'reg_lambda': 7.1036414361646285, 'gamma': 0.19787617221287515}
+[2026-04-06 08:57:52,596] INFO - Stage1: split=scaffold seed=33
+[2026-04-06 08:57:52,655] INFO - scale_pos_weight=0.419 (train pos=5235 neg=2191)
+[2026-04-06 09:00:01,480] INFO - Best val aucpr=0.8841 with params={'learning_rate': 0.1705936839006788, 'max_depth': 8, 'min_child_weight': 2.2550121731485713, 'subsample': 0.7654052743976928, 'colsample_bytree': 0.9694192091353183, 'reg_alpha': 3.729426691715587, 'reg_lambda': 5.988634090471631, 'gamma': 0.1818110520775562}
+[2026-04-06 09:00:04,254] INFO - Stage1: split=scaffold seed=44
+[2026-04-06 09:00:04,283] INFO - scale_pos_weight=0.416 (train pos=5244 neg=2182)
+[2026-04-06 09:03:31,624] INFO - Best val aucpr=0.8903 with params={'learning_rate': 0.038897713840290275, 'max_depth': 10, 'min_child_weight': 0.7321375425148989, 'subsample': 0.7307751612899271, 'colsample_bytree': 0.6349821309403095, 'reg_alpha': 7.615923965888912e-08, 'reg_lambda': 0.17237131287090696, 'gamma': 0.2678770893115723}
+[2026-04-06 09:03:35,083] INFO - Stage1: split=scaffold seed=55
+[2026-04-06 09:03:35,116] INFO - scale_pos_weight=0.419 (train pos=5233 neg=2193)
+[2026-04-06 09:06:28,501] INFO - Best val aucpr=0.8888 with params={'learning_rate': 0.014055118951942837, 'max_depth': 10, 'min_child_weight': 0.5597812709393503, 'subsample': 0.7482915713543934, 'colsample_bytree': 0.7359739793337408, 'reg_alpha': 6.426658852204297e-06, 'reg_lambda': 0.0004512052688449555, 'gamma': 0.711851129569443}
+[2026-04-06 09:06:34,121] INFO - Stage1: split=cluster seed=11
+[2026-04-06 09:06:34,121] INFO - Using sigmoid calibration for cluster split to reduce overfitting risk.
+[2026-04-06 09:06:34,157] INFO - scale_pos_weight=0.409 (train pos=5270 neg=2156)
+[2026-04-06 09:09:33,205] INFO - Best val aucpr=0.8426 with params={'learning_rate': 0.04446707651725236, 'max_depth': 10, 'min_child_weight': 0.5772616195626448, 'subsample': 0.7945474640238519, 'colsample_bytree': 0.6055251031097578, 'reg_alpha': 0.0001448895025617453, 'reg_lambda': 5.131768519678015, 'gamma': 0.4063890556438156}
+[2026-04-06 09:09:38,771] INFO - Stage1: split=cluster seed=22
+[2026-04-06 09:09:38,772] INFO - Using sigmoid calibration for cluster split to reduce overfitting risk.
+[2026-04-06 09:09:38,795] INFO - scale_pos_weight=0.407 (train pos=5279 neg=2147)
+[2026-04-06 09:11:46,512] INFO - Best val aucpr=0.8508 with params={'learning_rate': 0.06877874314840382, 'max_depth': 9, 'min_child_weight': 0.9322640811758169, 'subsample': 0.8105695378048127, 'colsample_bytree': 0.8701334208767365, 'reg_alpha': 2.8056933964326e-06, 'reg_lambda': 3.6291503750671223, 'gamma': 0.1578731806025353}
+[2026-04-06 09:11:50,378] INFO - Stage1: split=cluster seed=33
+[2026-04-06 09:11:50,378] INFO - Using sigmoid calibration for cluster split to reduce overfitting risk.
+[2026-04-06 09:11:50,405] INFO - scale_pos_weight=0.408 (train pos=5274 neg=2152)
+[2026-04-06 09:14:40,778] INFO - Best val aucpr=0.8645 with params={'learning_rate': 0.028136817279018896, 'max_depth': 10, 'min_child_weight': 0.6855583652542578, 'subsample': 0.7354374815828907, 'colsample_bytree': 0.617549601293587, 'reg_alpha': 6.461160219084772e-06, 'reg_lambda': 0.002761413129220234, 'gamma': 0.5432504302594927}
+[2026-04-06 09:14:45,225] INFO - Stage1: split=cluster seed=44
+[2026-04-06 09:14:45,225] INFO - Using sigmoid calibration for cluster split to reduce overfitting risk.
+[2026-04-06 09:14:45,250] INFO - scale_pos_weight=0.409 (train pos=5270 neg=2156)
+[2026-04-06 09:16:37,823] INFO - Best val aucpr=0.8479 with params={'learning_rate': 0.21312951441546232, 'max_depth': 8, 'min_child_weight': 1.3182851886927203, 'subsample': 0.6068744601075835, 'colsample_bytree': 0.8279679066657979, 'reg_alpha': 8.113466471626518e-05, 'reg_lambda': 7.587120682342036, 'gamma': 0.05453795212230679}
+[2026-04-06 09:16:40,195] INFO - Stage1: split=cluster seed=55
+[2026-04-06 09:16:40,195] INFO - Using sigmoid calibration for cluster split to reduce overfitting risk.
+[2026-04-06 09:16:40,254] INFO - scale_pos_weight=0.410 (train pos=5267 neg=2159)
+[2026-04-06 09:18:53,977] INFO - Best val aucpr=0.8543 with params={'learning_rate': 0.2823237185449654, 'max_depth': 8, 'min_child_weight': 1.9570224006597294, 'subsample': 0.7828853039564654, 'colsample_bytree': 0.942517921598015, 'reg_alpha': 2.8062232214785115e-06, 'reg_lambda': 2.443659944969435e-07, 'gamma': 1.2911744944794337}
+[2026-04-06 09:18:55,719] INFO - Wrote reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions/tables/benchmark_results.csv
+[2026-04-06 09:19:05,847] INFO - Wrote reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions/tables/applicability_domain_bins.csv
+[2026-04-06 09:19:05,848] INFO - Stage 1 completed.
+[2026-04-06 09:19:05,850] INFO - Stage 1 completed successfully. Artifacts at: reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions
