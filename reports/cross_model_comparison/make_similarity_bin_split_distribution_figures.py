@@ -45,10 +45,10 @@ SPLIT_LABELS = {
 }
 SIM_BIN_ORDER = ["<0.3", "0.3-0.5", "0.5-0.7", ">0.7"]
 SIM_BIN_COLORS = {
-    "<0.3": "#D85A30",
+    "<0.3": "#FA8072",
     "0.3-0.5": "#E6A66A",
     "0.5-0.7": "#8BB8E8",
-    ">0.7": "#3266AD",
+    ">0.7": "#87CEEB",
 }
 SIM_BIN_TEXT_COLORS = {
     "<0.3": "white",
@@ -415,6 +415,8 @@ def save_extremes_figure(count_df: pd.DataFrame, out_png: Path, out_pdf: Path) -
     fig, ax = plt.subplots(figsize=(DOUBLE_COL * 0.62, 3.7))
     offsets = {"<0.3": -width / 2.0, ">0.7": width / 2.0}
     legend_labels = {"<0.3": "<0.3 (novel chemistry)", ">0.7": ">0.7 (familiar chemistry)"}
+    label_x_nudge = {"<0.3": -0.025, ">0.7": 0.025}
+    label_align = {"<0.3": "right", ">0.7": "left"}
 
     for sim_bin in ["<0.3", ">0.7"]:
         heights = pivot[sim_bin].to_numpy(dtype=float)
@@ -429,14 +431,22 @@ def save_extremes_figure(count_df: pd.DataFrame, out_png: Path, out_pdf: Path) -
             label=legend_labels[sim_bin],
         )
         for idx, (height, count) in enumerate(zip(heights, counts)):
+            label_y = min(height + (0.024 if height < 0.65 else 0.018), 0.865)
             ax.text(
-                x[idx] + offsets[sim_bin],
-                height + 0.018,
+                x[idx] + offsets[sim_bin] + label_x_nudge[sim_bin],
+                label_y,
                 f"{height * 100:.1f}%\n(n={int(round(count)):,})",
-                ha="center",
+                ha=label_align[sim_bin],
                 va="bottom",
-                fontsize=7.5,
+                fontsize=7.1,
+                linespacing=0.95,
                 color="#333333",
+                bbox={
+                    "boxstyle": "round,pad=0.18",
+                    "facecolor": "white",
+                    "edgecolor": "none",
+                    "alpha": 0.94,
+                },
             )
 
     ax.set_xticks(x)
@@ -447,12 +457,12 @@ def save_extremes_figure(count_df: pd.DataFrame, out_png: Path, out_pdf: Path) -
         y=0.97,
         fontsize=10.5,
     )
-    ax.set_ylim(0.0, 0.82)
+    ax.set_ylim(0.0, 0.90)
     ax.yaxis.set_major_formatter(mticker.PercentFormatter(1.0, decimals=0))
-    ax.grid(axis="y", color="#d9d9d9", linewidth=0.7, alpha=0.8)
+    ax.grid(False)
     ax.set_axisbelow(True)
     fig.legend(frameon=False, loc="upper center", bbox_to_anchor=(0.5, 0.91), ncol=2)
-    fig.subplots_adjust(top=0.81)
+    fig.subplots_adjust(top=0.82)
     fig.savefig(out_png, dpi=300, bbox_inches="tight")
     fig.savefig(out_pdf, dpi=300, bbox_inches="tight")
     plt.close(fig)

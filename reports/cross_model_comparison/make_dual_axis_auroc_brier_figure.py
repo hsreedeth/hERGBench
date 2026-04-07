@@ -36,24 +36,21 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 try:
     from hergbench.analysis.paper_figures import (
-        BLUE,
-        CORAL,
         DOUBLE_COL,
-        LIGHT_BLUE,
-        LIGHT_CORAL,
         SIM_BIN_LABELS,
         SIM_BIN_ORDER,
     )
 except Exception:
-    BLUE = "#3266ad"
-    CORAL = "#D85A30"
-    LIGHT_BLUE = "#a6c4e8"
-    LIGHT_CORAL = "#f0b8a0"
     DOUBLE_COL = 7.00
     SIM_BIN_ORDER = ["<0.3", "0.3-0.5", "0.5-0.7", ">0.7"]
     SIM_BIN_LABELS = ["<0.3", "0.3–0.5", "0.5–0.7", ">0.7"]
 
-SPLIT_ORDER = ["cluster", "random", "scaffold"]
+SKY_BLUE = "#87CEEB"
+SALMON = "#FA8072"
+LIGHT_SKY_BLUE = "#D8F0FA"
+LIGHT_SALMON = "#FBD3CD"
+
+SPLIT_ORDER = ["random", "scaffold", "cluster"]
 MODEL_ORDER = ["chemprop_dmnn", "xgboost"]
 MODEL_LABELS = {
     "chemprop_dmnn": "D-MPNN",
@@ -66,13 +63,13 @@ SPLIT_LABELS = {
 }
 MODEL_STYLES = {
     "chemprop_dmnn": {
-        "color": BLUE,
-        "fill": LIGHT_BLUE,
+        "color": SKY_BLUE,
+        "fill": LIGHT_SKY_BLUE,
         "marker": "o",
     },
     "xgboost": {
-        "color": CORAL,
-        "fill": LIGHT_CORAL,
+        "color": SALMON,
+        "fill": LIGHT_SALMON,
         "marker": "o",
     },
 }
@@ -91,6 +88,11 @@ def parse_args() -> argparse.Namespace:
         "--output-dir",
         default=str(REPO_ROOT / "reports" / "cross_model_comparison"),
         help="Directory for new output figures.",
+    )
+    parser.add_argument(
+        "--tag",
+        default="",
+        help="Optional suffix appended to output stems, for example 'paperready'.",
     )
     return parser.parse_args()
 
@@ -197,10 +199,10 @@ def print_rows_used(plot_df: pd.DataFrame) -> None:
 
 def build_series_handles() -> list[Line2D]:
     return [
-        Line2D([0], [0], color=BLUE, marker="o", linestyle="-", linewidth=1.8, markersize=5, label="D-MPNN AUROC"),
-        Line2D([0], [0], color=CORAL, marker="o", linestyle="-", linewidth=1.8, markersize=5, label="XGBoost AUROC"),
-        Line2D([0], [0], color=BLUE, marker="o", linestyle="--", linewidth=1.6, markersize=4, alpha=0.9, label="D-MPNN Brier"),
-        Line2D([0], [0], color=CORAL, marker="o", linestyle="--", linewidth=1.6, markersize=4, alpha=0.9, label="XGBoost Brier"),
+        Line2D([0], [0], color=SKY_BLUE, marker="o", linestyle="-", linewidth=1.8, markersize=5, label="D-MPNN AUROC"),
+        Line2D([0], [0], color=SALMON, marker="o", linestyle="-", linewidth=1.8, markersize=5, label="XGBoost AUROC"),
+        Line2D([0], [0], color=SKY_BLUE, marker="o", linestyle="--", linewidth=1.6, markersize=4, alpha=0.9, label="D-MPNN Brier"),
+        Line2D([0], [0], color=SALMON, marker="o", linestyle="--", linewidth=1.6, markersize=4, alpha=0.9, label="XGBoost Brier"),
     ]
 
 
@@ -348,10 +350,11 @@ def main() -> int:
     output_dir = Path(args.output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    dual_png = output_dir / "figure_dual_axis_auroc_brier_chembl.png"
-    dual_pdf = output_dir / "figure_dual_axis_auroc_brier_chembl.pdf"
-    stacked_png = output_dir / "figure_stacked_auroc_brier_chembl.png"
-    stacked_pdf = output_dir / "figure_stacked_auroc_brier_chembl.pdf"
+    suffix = f"_{args.tag}" if args.tag else ""
+    dual_png = output_dir / f"figure_dual_axis_auroc_brier_chembl{suffix}.png"
+    dual_pdf = output_dir / f"figure_dual_axis_auroc_brier_chembl{suffix}.pdf"
+    stacked_png = output_dir / f"figure_stacked_auroc_brier_chembl{suffix}.png"
+    stacked_pdf = output_dir / f"figure_stacked_auroc_brier_chembl{suffix}.pdf"
     ensure_new_outputs([dual_png, dual_pdf, stacked_png, stacked_pdf])
 
     plot_df = load_plot_rows(input_path)

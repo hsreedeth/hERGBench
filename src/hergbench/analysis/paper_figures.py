@@ -5,8 +5,8 @@ Figure inventory
 ----------------
 fig1_gradient_6panel        2×3 AUROC (and Brier) heatmap-style panels,
                             dataset × split-type, ±1σ error bands.
-fig2_reliability_by_bin     2×2 reliability diagrams per Tanimoto sim-bin
-                            (ChEMBL scaffold by default).
+fig2_reliability_by_bin     2×6 reliability diagrams per Tanimoto sim-bin
+                            across Random, Scaffold, and Cluster.
 fig3_ad_performance_split   Per-bin AUROC bar chart for TDC cluster, highlighting
                             D-MPNN vs XGBoost divergence across similarity zones.
 fig4_cross_model_comparison Grouped dot plot: D-MPNN vs XGBoost across all
@@ -37,9 +37,11 @@ logger = logging.getLogger(__name__)
 
 BLUE = "#3266ad"    # D-MPNN / chemprop
 CORAL = "#D85A30"   # XGBoost
+SALMON = "#FA8072"  # reliability panels / accent
 GREY = "#888888"    # reference lines / uncalibrated
 LIGHT_BLUE = "#a6c4e8"
 LIGHT_CORAL = "#f0b8a0"
+LIGHT_SALMON = "#FBD3CD"
 
 SIM_BIN_ORDER = ["<0.3", "0.3-0.5", "0.5-0.7", ">0.7"]
 SIM_BIN_LABELS = ["<0.3", "0.3–0.5", "0.5–0.7", ">0.7"]
@@ -259,74 +261,127 @@ def fig_reliability_by_bin(
     output_dir: Path,
     repo_root: Path,
     dataset: str = "chembl",
-    split_type: str = "scaffold",
     dpi: int = 300,
     n_bins: int = 10,
 ) -> None:
-    """2×2 reliability diagrams per Tanimoto sim-bin.
+    """2×6 reliability panel across split regimes and similarity bins.
 
-    Uses all available seed runs for the given dataset/split_type, combined.
-    Falls back to a placeholder if prediction files are unavailable.
+    Uses all available seed runs for the given dataset, combined within each
+    split_type × similarity-bin panel. The 12 panels are laid out as:
+      row 1: Random / Scaffold / Cluster for bins <0.3 and 0.3-0.5
+      row 2: Random / Scaffold / Cluster for bins 0.5-0.7 and >0.7
     """
     import matplotlib.pyplot as plt
     from sklearn.calibration import calibration_curve
 
-    preds_df = _collect_test_preds_by_bin(repo_root, dataset, split_type)
+    split_types = ["random", "scaffold", "cluster"]
+    preds_by_split = {
+        split: _collect_test_preds_by_bin(repo_root, dataset, split)
+        for split in split_types
+    }
 
-    if preds_df.empty:
+    if all(df.empty for df in preds_by_split.values()):
         logger.warning(
-            "No per-prediction data found for %s/%s — skipping fig_reliability_by_bin.",
-            dataset, split_type,
+            "No per-prediction data found for %s across split regimes — skipping fig_reliability_by_bin.",
+            dataset,
         )
         return
 
-    fig, axes = plt.subplots(2, 2, figsize=(DOUBLE_COL, DOUBLE_COL * 0.85), sharex=True, sharey=True)
-    axes = axes.ravel()
+    panel_order = []
+    for split_type in split_types:
+        panel_order.extend([
+            (split_type, SIM_BIN_ORDER[0]),
+            (split_type, SIM_BIN_ORDER[1]),
+        ])
+    for split_type in split_types:
+        panel_order.extend([
+            (split_type, SIM_BIN_ORDER[2]),
+            (split_type, SIM_BIN_ORDER[3]),
+        ])
 
-    for i, sim_bin in enumerate(SIM_BIN_ORDER):
+    fig, axes = plt.subplots(
+        2,
+        6,
+        figsize=(DOUBLE_COL * 1.75, DOUBLE_COL * 0.72),
+        sharex=True,
+        sharey=True,
+    )
+    axes = axes.ravel()
+    split_labels = {"random": "Random", "scaffold": "Scaffold", "cluster": "Cluster"}
+
+    for i, (split_type, sim_bin) in enumerate(panel_order):
         ax = axes[i]
-        sub = preds_df[preds_df["sim_bin"] == sim_bin].copy()
+        preds_df = preds_by_split[split_type]
+        sub = preds_df[preds_df["sim_bin"] == sim_bin].copy() if not preds_df.empty else pd.DataFrame()
 
         ax.plot([0, 1], [0, 1], "k--", linewidth=0.8, label="Perfect")
 
         if sub.empty or len(sub) < 5:
-            ax.text(0.5, 0.5, "n < 5\n(insufficient data)",
-                    ha="center", va="center", transform=ax.transAxes, fontsize=8, color=GREY)
+            ax.text(
+                0.5, 0.5, "n < 5\n(insufficient data)",
+                ha="center", va="center", transform=ax.transAxes, fontsize=7.5, color=GREY,
+            )
         else:
             y_true = sub["y"].astype(int).to_numpy()
             p_cal = sub["p_cal"].astype(float).to_numpy()
 
             if y_true.sum() == 0 or y_true.sum() == len(y_true):
-                ax.text(0.5, 0.5, "single class\nin bin",
-                        ha="center", va="center", transform=ax.transAxes, fontsize=8, color=GREY)
+                ax.text(
+                    0.5, 0.5, "single class\nin bin",
+                    ha="center", va="center", transform=ax.transAxes, fontsize=7.5, color=GREY,
+                )
             else:
                 try:
                     with warnings.catch_warnings():
                         warnings.simplefilter("ignore")
-                        frac_pos, mean_pred = calibration_curve(y_true, p_cal, n_bins=n_bins, strategy="uniform")
-                    ax.plot(mean_pred, frac_pos, "o-", color=BLUE, linewidth=1.5,
-                            markersize=4, label=f"D-MPNN (n={len(sub)})")
-                    ax.fill_between(mean_pred, frac_pos, mean_pred,
-                                    alpha=0.15, color=BLUE, label="Calibration gap")
+                        frac_pos, mean_pred = calibration_curve(
+                            y_true, p_cal, n_bins=n_bins, strategy="uniform"
+                        )
+                    ax.plot(
+                        mean_pred,
+                        frac_pos,
+                        "o-",
+                        color=SALMON,
+                        linewidth=1.5,
+                        markersize=3.8,
+                        label=f"D-MPNN (n={len(sub)})",
+                    )
+                    ax.fill_between(
+                        mean_pred,
+                        frac_pos,
+                        mean_pred,
+                        alpha=0.18,
+                        color=LIGHT_SALMON,
+                        label="Calibration gap",
+                    )
                 except Exception as exc:
-                    logger.debug("calibration_curve failed for bin %s: %s", sim_bin, exc)
+                    logger.debug(
+                        "calibration_curve failed for split=%s bin=%s: %s",
+                        split_type,
+                        sim_bin,
+                        exc,
+                    )
 
         ax.set_xlim(-0.02, 1.02)
         ax.set_ylim(-0.02, 1.02)
-        ax.set_title(f"Sim bin: {SIM_BIN_LABELS[i]}", fontsize=9, fontweight="bold")
+        ax.set_title(
+            f"{split_labels[split_type]}\n{sim_bin}",
+            fontsize=8.5,
+            fontweight="bold",
+        )
         ax.tick_params(labelsize=7)
-        if i in (0, 2):
+        if i % 6 == 0:
             ax.set_ylabel("Fraction positive", fontsize=8)
-        if i in (2, 3):
+        if i >= 6:
             ax.set_xlabel("Mean predicted probability", fontsize=8)
-        if not sub.empty and len(sub) >= 5:
-            ax.legend(fontsize=6, loc="upper left")
+        ax.legend(fontsize=6.5, loc="upper left", framealpha=0.9)
 
     fig.suptitle(
-        f"Reliability by Tanimoto bin\n({dataset.upper()} {split_type} — D-MPNN, all seeds)",
-        fontsize=9, y=1.01,
+        f"Reliability by Tanimoto bin\n({dataset.upper()} — D-MPNN, all seeds across split regimes)",
+        fontsize=10,
+        y=0.995,
     )
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0, 1, 0.95), w_pad=0.6, h_pad=0.9)
     _savefig(fig, output_dir, "fig2_reliability_by_bin", dpi=dpi)
     plt.close(fig)
 
@@ -624,7 +679,7 @@ def generate_all_figures(
         try:
             fig_reliability_by_bin(
                 output_dir=output_dir, repo_root=repo_root,
-                dataset="chembl", split_type="scaffold", dpi=dpi,
+                dataset="chembl", dpi=dpi,
             )
         except Exception as exc:
             logger.error("fig2 failed: %s", exc, exc_info=True)
