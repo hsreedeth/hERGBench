@@ -1,0 +1,19 @@
+{
+  "conflicts": [],
+  "consistency": {
+    "main_completed_count": 1,
+    "main_covers_all_completed_shard_reports": true,
+    "unique_completed_across_shards": 1
+  },
+  "copied": [],
+  "dry_run": false,
+  "ignored_incomplete": [],
+  "pilot_root": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot",
+  "skipped_existing": [
+    {
+      "action": "already_merged_identical",
+      "mol_id": "a20f74e3f8ebfea51b2477906e00b06b1ca1e4b7",
+      "shard": "b0507"
+    }
+  ]
+}

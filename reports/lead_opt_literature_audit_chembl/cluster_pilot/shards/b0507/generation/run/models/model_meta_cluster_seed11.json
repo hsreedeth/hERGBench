@@ -1,0 +1,21 @@
+{
+  "split_type": "cluster",
+  "seed": 11,
+  "best_val_score": 0.842584627382402,
+  "best_params": {
+    "learning_rate": 0.04446707651725236,
+    "max_depth": 10,
+    "min_child_weight": 0.5772616195626448,
+    "subsample": 0.7945474640238519,
+    "colsample_bytree": 0.6055251031097578,
+    "reg_alpha": 0.0001448895025617453,
+    "reg_lambda": 5.131768519678015,
+    "gamma": 0.4063890556438156
+  },
+  "scale_pos_weight": 0.4091081593927894,
+  "calibration": {
+    "method": "sigmoid",
+    "threshold_metric": "youden",
+    "threshold": 0.7100000000000001
+  }
+}

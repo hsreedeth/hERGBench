@@ -1,0 +1,55 @@
+project:
+  project_name: hergbench
+  run_name: stage1_chembl_predictions
+repro:
+  seed: 42
+paths:
+  data_raw: data/chembl/raw
+  data_processed: data/chembl/processed
+  data_splits: data/chembl/splits
+  reports_root: reports
+  runs_root: reports/runs
+logging:
+  level: INFO
+stage1:
+  dataset:
+    tdc_task: Tox
+    name: hERG
+    smiles_col: Drug
+    label_col: Y
+  splits:
+    types:
+    - random
+    - scaffold
+    - cluster
+    frac_train: 0.8
+    frac_val: 0.1
+    frac_test: 0.1
+    seeds:
+    - 11
+    - 22
+    - 33
+    - 44
+    - 55
+    butina_cutoff: 0.6
+    force_resplit: false
+  features:
+    radius: 2
+    n_bits: 2048
+  model:
+    objective: aucpr
+    optuna_trials: 75
+    early_stopping_rounds: 50
+    max_estimators: 4000
+  calibration:
+    method: isotonic
+    threshold_metric: youden
+    n_bins: 10
+  eval:
+    bootstrap_B: 200
+    bins:
+    - 0.3
+    - 0.5
+    - 0.7
+  counterfactuals:
+    enable: false

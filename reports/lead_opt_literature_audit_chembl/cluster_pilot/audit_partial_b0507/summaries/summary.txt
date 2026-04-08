@@ -1,0 +1,18 @@
+Lead Optimization Literature-Concordant Counterfactual Audit
+
+Parents analyzed: 1
+Candidates in candidate-level table: 3
+Candidates in summary cohort: 1
+Tiers included: Tier 1-3 only
+Summary cohort mode: best candidate per parent
+
+Scaffold-preserved candidates in summary cohort: 100.0% (common).
+Medicinal locality flag rate: 100.0%. Overall literature-concordant rate: 100.0%.
+Most common literature-concordant direction: lower logP (100.0%).
+Least common literature-concordant direction: reduce rotatable bonds (0.0%).
+Tier summary: Tier 1 — Flip: n=1, concordant=100.0%.
+
+Assumptions and boundaries:
+- The current serialized field `similarity_to_train` in lead-opt report.json counterfactual records is interpreted here as candidate-to-parent similarity, not train-set similarity.
+- Concordance rules are simple heuristic literature-direction checks, not causal or experimental proof.
+- Parent novelty refers to the parent molecule's train-test similarity regime when available.

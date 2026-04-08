@@ -1,0 +1,16 @@
+{
+  "dataset_fallback_used": 0,
+  "no_surviving_candidates": 0,
+  "panel_csv": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/inputs_snapshot/chembl_cluster_pilot_parent_panel.csv",
+  "parents_attempted": 20,
+  "parents_completed": 1,
+  "run_incomplete": true,
+  "source_run": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/stage1_chembl/reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions",
+  "tier_counts": {
+    "none": 0,
+    "tier1": 1,
+    "tier2": 0,
+    "tier3": 0,
+    "tier4": 0
+  }
+}

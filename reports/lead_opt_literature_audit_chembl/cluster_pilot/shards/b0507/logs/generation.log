@@ -1,0 +1,9 @@
+[2026-04-08 11:42:41,953] INFO - Using pilot config: /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/configs/chembl_cluster_counterfactual_pilot.yaml
+[2026-04-08 11:42:41,955] INFO - Using source run: /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/stage1_chembl/reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions
+[2026-04-08 11:42:42,018] INFO - Loaded processed ChEMBL dataset from /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/data/chembl/processed/chembl_herg_clean.csv (9283 rows)
+[2026-04-08 11:42:52,436] INFO - Pilot generation parents to attempt: 5
+[2026-04-08 11:42:52,442] INFO - Threshold used: 0.710
+[2026-04-08 11:42:52,445] INFO - Source prediction file: /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/stage1_chembl/reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions/predictions/test_preds_cluster_seed11_with_sim.csv
+[2026-04-08 11:44:12,006] INFO - ExMol requested budget=3000, sampled=2003 (err=None)
+[2026-04-08 11:45:52,294] INFO - CF filtering flip (none): {'sampled': 2003, 'invalid': 0, 'duplicate': 8, 'scaffold_filtered': 350, 'similarity_filtered': 1391, 'prob_filtered': 102, 'delta_filtered': 0, 'sa_filtered': 0, 'logp_filtered': 9, 'qed_filtered': 0, 'alert_filtered': 55, 'kept': 88, 'min_tanimoto_used': 0.5, 'min_tanimoto_source': 'min_tanimoto_flip', 'prob_max_used': 0.709999, 'delta_min_used': None, 'sa_max_used': 4.5, 'logp_delta_max_used': 1.5, 'qed_min_used': 0.0, 'pains_used': True}
+[2026-04-08 11:45:52,996] INFO - Lead report 1/5 written: /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/b0507/generation/run/lead_reports/a20f74e3f8ebfea51b2477906e00b06b1ca1e4b7 | final_tier=flip | generated=5 | fallback=0

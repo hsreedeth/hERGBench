@@ -1,0 +1,14 @@
+{
+  "bundle_path": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/stage1_chembl/reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions/models/model_cluster_seed11.joblib",
+  "config_path": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/stage1_chembl/reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions/config.resolved.yaml",
+  "dataset": "chembl",
+  "metadata_path": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/stage1_chembl/reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions/metadata.json",
+  "model_meta_path": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/stage1_chembl/reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions/models/model_meta_cluster_seed11.json",
+  "pred_path": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/stage1_chembl/reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions/predictions/test_preds_cluster_seed11.csv",
+  "pred_with_sim_path": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/stage1_chembl/reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions/predictions/test_preds_cluster_seed11_with_sim.csv",
+  "seed": 11,
+  "source_run": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/stage1_chembl/reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions",
+  "split_csv_path": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/data/chembl/splits/cluster_seed11.csv",
+  "split_type": "cluster",
+  "threshold": 0.7100000000000001
+}

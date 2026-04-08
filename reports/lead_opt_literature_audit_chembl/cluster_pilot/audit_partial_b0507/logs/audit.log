@@ -1,0 +1,22 @@
+2026-04-08 11:47:15,089 INFO Input run directory: /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/b0507/generation/run
+2026-04-08 11:47:15,090 INFO Lead reports directory: /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/b0507/generation/run/lead_reports
+2026-04-08 11:47:15,091 INFO Run metadata: /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/b0507/generation/run/metadata.json
+2026-04-08 11:47:15,129 INFO Dataset label used: chembl
+2026-04-08 11:47:15,130 INFO Report files loaded: 1
+2026-04-08 11:47:15,131 INFO Raw candidate rows parsed: 5
+2026-04-08 11:47:15,132 INFO Prediction context file: /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/b0507/generation/run/predictions/test_preds_cluster_seed11_with_sim.csv
+2026-04-08 11:47:15,132 INFO Parent novelty join file: /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/inputs_snapshot/shards/chembl_cluster_pilot_b0507.csv
+2026-04-08 11:47:15,133 WARNING Parent novelty joined from /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/inputs_snapshot/shards/chembl_cluster_pilot_b0507.csv and used in preference to any report-level novelty fields.
+2026-04-08 11:47:15,134 INFO Descriptor scoring: 10 candidate/parent rows collapsed to 6 unique SMILES (workers=1, chunk_size=64)
+2026-04-08 11:47:17,753 INFO Candidates after analysis filters: 3
+2026-04-08 11:47:17,754 INFO Best-per-parent rows: 1
+2026-04-08 11:47:17,756 INFO Summary cohort rows: 1 (best-per-parent)
+2026-04-08 11:47:17,757 INFO Filter count loaded_candidates=5
+2026-04-08 11:47:17,759 INFO Filter count excluded_dataset_analogues=0
+2026-04-08 11:47:17,761 INFO Filter count excluded_tier4=2
+2026-04-08 11:47:17,762 INFO Filter count excluded_relaxed=0
+2026-04-08 11:47:17,764 INFO Filter count excluded_split_type=0
+2026-04-08 11:47:17,765 INFO Filter count excluded_similarity_to_parent=0
+2026-04-08 11:47:17,766 INFO Filter count excluded_non_scaffold_preserved=0
+2026-04-08 11:47:17,767 INFO Filter count excluded_by_top_n=0
+2026-04-08 11:47:17,768 INFO Filter count remaining_candidates=3

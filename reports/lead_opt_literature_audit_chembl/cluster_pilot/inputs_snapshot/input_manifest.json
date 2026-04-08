@@ -1,0 +1,20 @@
+{
+  "input_root": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run",
+  "run_dir": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run",
+  "lead_reports_dir": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/lead_reports",
+  "metadata_path": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/metadata.json",
+  "prediction_files": [
+    "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/predictions/test_preds_cluster_seed11_with_sim.csv"
+  ],
+  "dataset": "chembl",
+  "report_count": 1,
+  "warnings": [
+    "Parent novelty joined from /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/inputs_snapshot/chembl_cluster_pilot_parent_panel.csv and used in preference to any report-level novelty fields."
+  ],
+  "notes": [
+    "The current serialized field `similarity_to_train` in lead-opt report.json counterfactual records is interpreted here as candidate-to-parent similarity, not train-set similarity."
+  ],
+  "join_parent_novelty_from": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/inputs_snapshot/chembl_cluster_pilot_parent_panel.csv",
+  "parent_panel_file": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/inputs_snapshot/chembl_cluster_pilot_parent_panel.csv",
+  "max_parents": null
+}

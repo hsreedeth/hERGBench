@@ -93,6 +93,21 @@ def _build_parser() -> argparse.ArgumentParser:
             "stratification."
         ),
     )
+    parser.add_argument(
+        "--parent-panel-file",
+        type=Path,
+        default=None,
+        help=(
+            "Optional CSV with mol_id and/or smiles used to restrict the audit to a "
+            "specific parent subset."
+        ),
+    )
+    parser.add_argument(
+        "--max-parents",
+        type=int,
+        default=None,
+        help="Optional deterministic cap on the number of parent reports loaded.",
+    )
     parser.set_defaults(include_relaxed=True)
     parser.add_argument(
         "--include-relaxed",
@@ -118,6 +133,29 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Keep at most the first N retained candidates per parent before any "
             "best-per-parent reduction. Use 0 for no pre-limit. Default: 0"
+        ),
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help=(
+            "Number of worker processes used for descriptor scoring in the audit step. "
+            "Default: 1"
+        ),
+    )
+    parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=64,
+        help="Chunk size passed to worker-process descriptor scoring. Default: 64",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help=(
+            "Resume a partially completed audit by reusing an existing candidate table "
+            "in the output root when run parameters match."
         ),
     )
     parser.add_argument(
@@ -154,6 +192,17 @@ def main() -> int:
         include_dataset_analogues=args.include_dataset_analogues,
         min_similarity_to_parent=args.min_similarity_to_parent,
         top_n_per_parent=args.top_n_per_parent,
+        parent_panel_file=(
+            (REPO_ROOT / args.parent_panel_file).resolve()
+            if args.parent_panel_file is not None and not args.parent_panel_file.is_absolute()
+            else args.parent_panel_file.resolve()
+            if args.parent_panel_file is not None
+            else None
+        ),
+        max_parents=args.max_parents,
+        workers=args.workers,
+        chunk_size=args.chunk_size,
+        resume=args.resume,
         join_parent_novelty_from=(
             (REPO_ROOT / args.join_parent_novelty_from).resolve()
             if args.join_parent_novelty_from is not None
@@ -189,6 +238,7 @@ def main() -> int:
         str(artifacts.input_manifest),
         str(artifacts.report_manifest),
         str(artifacts.rule_snapshot),
+        str(artifacts.run_parameters),
         str(artifacts.filter_counts),
         str(artifacts.log_path),
     ]
@@ -198,6 +248,7 @@ def main() -> int:
         "The serialized lead-opt field `similarity_to_train` in counterfactual records is interpreted as candidate-to-parent similarity, not train-set similarity.",
         "Parent novelty is taken from upstream prediction files when available, or from --join-parent-novelty-from if supplied.",
         "The concordance rubric is heuristic and literature-directional only; it is not a causal or experimental validation layer.",
+        "Descriptor scoring can use multiple worker processes, but the scientific rule set and filtering logic are unchanged.",
     ]
 
     next_step = (
@@ -212,6 +263,8 @@ def main() -> int:
     print(f"  - retained candidates: {summary['filtered_candidates']}")
     print(f"  - best-per-parent rows: {summary['best_per_parent']}")
     print(f"  - summary cohort parents: {summary['summary_parents']}")
+    print(f"  - workers: {args.workers}")
+    print(f"  - resume: {args.resume}")
     print(f"  - output root: {Path(artifacts.candidate_table).parents[1]}")
     print("")
     print("Assumptions")

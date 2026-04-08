@@ -1,0 +1,46 @@
+{
+  "version": "v1",
+  "note": "Simple literature-concordant audit rules for anti-hERG directionality. These are heuristic, descriptive rules for post hoc auditing only.",
+  "core_rules": [
+    {
+      "name": "rule_lower_logp",
+      "label": "Lower logP"
+    },
+    {
+      "name": "rule_increase_tpsa",
+      "label": "Increase TPSA"
+    },
+    {
+      "name": "rule_reduce_aromatic_rings",
+      "label": "Reduce aromatic ring count"
+    },
+    {
+      "name": "rule_reduce_rotatable_bonds",
+      "label": "Reduce rotatable bonds"
+    },
+    {
+      "name": "rule_reduce_cationic_burden_proxy",
+      "label": "Reduce cationic burden proxy"
+    }
+  ],
+  "auxiliary_rules": [
+    {
+      "name": "rule_increase_fraction_csp3",
+      "label": "Increase fraction Csp3"
+    },
+    {
+      "name": "rule_reduce_formal_charge",
+      "label": "Reduce formal charge"
+    },
+    {
+      "name": "rule_reduce_tertiary_amine_like",
+      "label": "Reduce tertiary amine-like motif"
+    }
+  ],
+  "medicinal_locality_components": [
+    "scaffold_preserved",
+    "similarity_to_parent >= 0.5",
+    "abs(delta_heavy_atom_count) <= 2"
+  ],
+  "similarity_field_note": "The current serialized field `similarity_to_train` in lead-opt report.json counterfactual records is interpreted here as candidate-to-parent similarity, not train-set similarity."
+}

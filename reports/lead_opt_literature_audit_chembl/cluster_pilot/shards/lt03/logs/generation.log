@@ -1,0 +1,7 @@
+[2026-04-08 11:42:41,952] INFO - Using pilot config: /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/configs/chembl_cluster_counterfactual_pilot.yaml
+[2026-04-08 11:42:41,953] INFO - Using source run: /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/stage1_chembl/reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions
+[2026-04-08 11:42:42,016] INFO - Loaded processed ChEMBL dataset from /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/data/chembl/processed/chembl_herg_clean.csv (9283 rows)
+[2026-04-08 11:42:52,461] INFO - Pilot generation parents to attempt: 5
+[2026-04-08 11:42:52,465] INFO - Threshold used: 0.710
+[2026-04-08 11:42:52,467] INFO - Source prediction file: /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/stage1_chembl/reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions/predictions/test_preds_cluster_seed11_with_sim.csv
+[2026-04-08 11:44:45,474] INFO - ExMol requested budget=3000, sampled=2374 (err=None)

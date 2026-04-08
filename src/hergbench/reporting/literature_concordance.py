@@ -12,6 +12,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from concurrent.futures import ProcessPoolExecutor
 from rdkit import Chem
 from rdkit.Chem import Crippen, Lipinski, rdMolDescriptors
 from rdkit.Chem.Scaffolds import MurckoScaffold
@@ -101,6 +102,7 @@ class AuditArtifacts:
     input_manifest: Path
     report_manifest: Path
     rule_snapshot: Path
+    run_parameters: Path
     filter_counts: Path
     log_path: Path
 
@@ -478,6 +480,7 @@ def compute_descriptor_block(smiles: str) -> dict[str, float | int | bool | str]
         "formal_positive_n_count": int(len(positive_n_atoms)),
         "cationic_burden_proxy": int(len(basic_atoms | positive_n_atoms)),
         "smiles_rdkit": Chem.MolToSmiles(mol, canonical=True),
+        "generic_scaffold_smiles": _generic_scaffold_smi(mol),
     }
 
 
@@ -489,15 +492,72 @@ def _is_concordant_increase(delta: float) -> bool:
     return pd.notna(delta) and float(delta) > 0
 
 
-def compute_concordance_fields(df: pd.DataFrame) -> pd.DataFrame:
+def _descriptor_worker(smiles: str) -> tuple[str, dict[str, float | int | bool | str]]:
+    return smiles, compute_descriptor_block(smiles)
+
+
+def _build_descriptor_map(
+    smiles_list: list[str],
+    *,
+    workers: int,
+    chunk_size: int,
+    logger: Optional[logging.Logger] = None,
+) -> dict[str, dict[str, float | int | bool | str]]:
+    unique_smiles = sorted({str(smiles) for smiles in smiles_list})
+    if logger:
+        logger.info(
+            "Descriptor scoring: %d candidate/parent rows collapsed to %d unique SMILES (workers=%d, chunk_size=%d)",
+            len(smiles_list),
+            len(unique_smiles),
+            workers,
+            chunk_size,
+        )
+    if not unique_smiles:
+        return {}
+
+    if workers <= 1:
+        return {smiles: compute_descriptor_block(smiles) for smiles in unique_smiles}
+
+    descriptor_map: dict[str, dict[str, float | int | bool | str]] = {}
+    try:
+        with ProcessPoolExecutor(max_workers=workers) as executor:
+            for smiles, descriptor_block in executor.map(
+                _descriptor_worker,
+                unique_smiles,
+                chunksize=max(1, int(chunk_size)),
+            ):
+                descriptor_map[smiles] = descriptor_block
+        return descriptor_map
+    except (PermissionError, OSError) as exc:
+        if logger:
+            logger.warning(
+                "Falling back to serial descriptor scoring because worker-process initialization failed: %s",
+                exc,
+            )
+        return {smiles: compute_descriptor_block(smiles) for smiles in unique_smiles}
+
+
+def compute_concordance_fields(
+    df: pd.DataFrame,
+    *,
+    workers: int = 1,
+    chunk_size: int = 64,
+    logger: Optional[logging.Logger] = None,
+) -> pd.DataFrame:
+    all_smiles = df["parent_smiles"].astype(str).tolist() + df["candidate_smiles"].astype(str).tolist()
+    descriptor_map = _build_descriptor_map(
+        all_smiles,
+        workers=max(1, int(workers)),
+        chunk_size=max(1, int(chunk_size)),
+        logger=logger,
+    )
+
     rows = []
     for row in df.to_dict(orient="records"):
-        parent_desc = compute_descriptor_block(row["parent_smiles"])
-        candidate_desc = compute_descriptor_block(row["candidate_smiles"])
-        base_mol = _mol_from_smiles(row["parent_smiles"])
-        cand_mol = _mol_from_smiles(row["candidate_smiles"])
-        base_scaffold = _generic_scaffold_smi(base_mol)
-        cand_scaffold = _generic_scaffold_smi(cand_mol)
+        parent_desc = descriptor_map[str(row["parent_smiles"])]
+        candidate_desc = descriptor_map[str(row["candidate_smiles"])]
+        base_scaffold = parent_desc.get("generic_scaffold_smiles")
+        cand_scaffold = candidate_desc.get("generic_scaffold_smiles")
         scaffold_preserved = bool(base_scaffold is not None and cand_scaffold == base_scaffold)
 
         enriched = dict(row)
@@ -713,6 +773,8 @@ def load_candidate_pairs(
     context: RunContext,
     dataset_override: Optional[str] = None,
     join_parent_novelty_from: Optional[Path] = None,
+    parent_panel_file: Optional[Path] = None,
+    max_parents: Optional[int] = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:
     dataset = infer_dataset(context, dataset_override)
     prediction_df = load_prediction_context(context.prediction_files)
@@ -721,6 +783,44 @@ def load_candidate_pairs(
         raise FileNotFoundError(
             f"No report.json files found under {context.lead_reports_dir}"
         )
+
+    selected_parent_ids: Optional[set[str]] = None
+    selected_parent_smiles: Optional[set[str]] = None
+    if parent_panel_file is not None:
+        panel_df = pd.read_csv(parent_panel_file)
+        if "mol_id" in panel_df.columns:
+            selected_parent_ids = {
+                str(value) for value in panel_df["mol_id"].dropna().astype(str).tolist()
+            }
+        if "smiles" in panel_df.columns:
+            selected_parent_smiles = {
+                str(value) for value in panel_df["smiles"].dropna().astype(str).tolist()
+            }
+        if not selected_parent_ids and not selected_parent_smiles:
+            raise ValueError(
+                f"Parent panel file {parent_panel_file} must contain mol_id and/or smiles."
+            )
+
+        filtered_paths: list[Path] = []
+        for report_path in report_paths:
+            report_parent_id = report_path.parent.name
+            if selected_parent_ids and report_parent_id in selected_parent_ids:
+                filtered_paths.append(report_path)
+                continue
+            if selected_parent_smiles:
+                report_data = _safe_json_load(report_path)
+                report_smiles = str(
+                    report_data.get("base_smiles_std") or report_data.get("base_smiles_raw") or ""
+                )
+                if report_smiles in selected_parent_smiles:
+                    filtered_paths.append(report_path)
+        report_paths = filtered_paths
+
+    if max_parents is not None and max_parents > 0:
+        report_paths = report_paths[: int(max_parents)]
+
+    if not report_paths:
+        raise ValueError("No lead reports remained after applying parent subset filters.")
 
     rows: list[dict[str, Any]] = []
     warnings: list[str] = []
@@ -805,6 +905,8 @@ def load_candidate_pairs(
         "prediction_files_used": [str(path) for path in context.prediction_files],
         "warnings": warnings,
         "notes": context.notes + [SIMILARITY_FIELD_NOTE],
+        "parent_panel_file": str(parent_panel_file) if parent_panel_file else None,
+        "max_parents": int(max_parents) if max_parents is not None else None,
     }
     return df, manifest_df, info
 
@@ -1032,8 +1134,14 @@ def write_input_manifest(
         "join_parent_novelty_from": (
             str(join_parent_novelty_from.resolve()) if join_parent_novelty_from else None
         ),
+        "parent_panel_file": info.get("parent_panel_file"),
+        "max_parents": info.get("max_parents"),
     }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def write_run_parameters(path: Path, params: dict[str, Any]) -> None:
+    path.write_text(json.dumps(params, indent=2), encoding="utf-8")
 
 
 def write_filter_counts(path: Path, counts: dict[str, int]) -> None:
@@ -1423,11 +1531,37 @@ def build_audit_outputs(
     min_similarity_to_parent: Optional[float],
     top_n_per_parent: int,
     join_parent_novelty_from: Optional[Path],
+    parent_panel_file: Optional[Path],
+    max_parents: Optional[int],
+    workers: int,
+    chunk_size: int,
+    resume: bool,
     verbose: bool = False,
 ) -> tuple[AuditArtifacts, dict[str, Any]]:
     paths = ensure_output_tree(output_root)
     log_path = paths["logs"] / "audit.log"
     logger = setup_audit_logger(log_path, verbose=verbose)
+
+    candidate_path = paths["tables"] / "counterfactual_literature_audit_candidates.csv"
+    run_parameters_path = paths["inputs_snapshot"] / "run_parameters.json"
+    requested_params = {
+        "dataset": dataset,
+        "split_type": split_type,
+        "include_tier4": include_tier4,
+        "best_per_parent_only": best_per_parent_only,
+        "scaffold_preserved_only": scaffold_preserved_only,
+        "include_relaxed": include_relaxed,
+        "include_dataset_analogues": include_dataset_analogues,
+        "min_similarity_to_parent": min_similarity_to_parent,
+        "top_n_per_parent": top_n_per_parent,
+        "join_parent_novelty_from": (
+            str(join_parent_novelty_from.resolve()) if join_parent_novelty_from else None
+        ),
+        "parent_panel_file": str(parent_panel_file.resolve()) if parent_panel_file else None,
+        "max_parents": max_parents,
+        "workers": int(workers),
+        "chunk_size": int(chunk_size),
+    }
 
     context = resolve_run_context(input_root)
     logger.info("Input run directory: %s", context.run_dir)
@@ -1441,6 +1575,8 @@ def build_audit_outputs(
         context=context,
         dataset_override=dataset,
         join_parent_novelty_from=join_parent_novelty_from,
+        parent_panel_file=parent_panel_file,
+        max_parents=max_parents,
     )
     logger.info("Dataset label used: %s", info["dataset"])
     logger.info("Report files loaded: %d", info["report_count"])
@@ -1452,17 +1588,43 @@ def build_audit_outputs(
     for warning in info.get("warnings", []):
         logger.warning("%s", warning)
 
-    candidates_scored = compute_concordance_fields(candidates_raw)
-    filtered_df, filter_counts = apply_analysis_filters(
-        candidates_scored,
-        include_tier4=include_tier4,
-        include_dataset_analogues=include_dataset_analogues,
-        include_relaxed=include_relaxed,
-        split_type=split_type,
-        scaffold_preserved_only=scaffold_preserved_only,
-        min_similarity_to_parent=min_similarity_to_parent,
-        top_n_per_parent=top_n_per_parent,
-    )
+    filter_counts_path = paths["logs"] / "filter_counts.json"
+    if resume and candidate_path.exists():
+        if run_parameters_path.exists():
+            saved_params = json.loads(run_parameters_path.read_text(encoding="utf-8"))
+            mismatch = {
+                key: {"requested": requested_params.get(key), "saved": saved_params.get(key)}
+                for key in requested_params
+                if requested_params.get(key) != saved_params.get(key)
+            }
+            if mismatch:
+                raise ValueError(
+                    "Resume requested but run parameters do not match the existing output root: "
+                    + json.dumps(mismatch, indent=2)
+                )
+        logger.info("Resume mode: reusing existing candidate table at %s", candidate_path)
+        filtered_df = pd.read_csv(candidate_path)
+        if filter_counts_path.exists():
+            filter_counts = json.loads(filter_counts_path.read_text(encoding="utf-8"))
+        else:
+            filter_counts = {"remaining_candidates": int(len(filtered_df))}
+    else:
+        candidates_scored = compute_concordance_fields(
+            candidates_raw,
+            workers=workers,
+            chunk_size=chunk_size,
+            logger=logger,
+        )
+        filtered_df, filter_counts = apply_analysis_filters(
+            candidates_scored,
+            include_tier4=include_tier4,
+            include_dataset_analogues=include_dataset_analogues,
+            include_relaxed=include_relaxed,
+            split_type=split_type,
+            scaffold_preserved_only=scaffold_preserved_only,
+            min_similarity_to_parent=min_similarity_to_parent,
+            top_n_per_parent=top_n_per_parent,
+        )
     best_df = pick_best_per_parent(filtered_df)
     analysis_df = best_df if best_per_parent_only else filtered_df
 
@@ -1526,11 +1688,11 @@ def build_audit_outputs(
     manifest_path = paths["inputs_snapshot"] / "input_manifest.json"
     report_manifest_path = paths["inputs_snapshot"] / "report_file_manifest.csv"
     rule_snapshot_path = paths["inputs_snapshot"] / "rule_set.json"
-    filter_counts_path = paths["logs"] / "filter_counts.json"
 
     write_input_manifest(manifest_path, context, info, join_parent_novelty_from)
     report_manifest_df.to_csv(report_manifest_path, index=False)
     write_rule_snapshot(rule_snapshot_path)
+    write_run_parameters(run_parameters_path, requested_params)
     write_filter_counts(filter_counts_path, filter_counts)
 
     artifacts = AuditArtifacts(
@@ -1547,6 +1709,7 @@ def build_audit_outputs(
         input_manifest=manifest_path,
         report_manifest=report_manifest_path,
         rule_snapshot=rule_snapshot_path,
+        run_parameters=run_parameters_path,
         filter_counts=filter_counts_path,
         log_path=log_path,
     )

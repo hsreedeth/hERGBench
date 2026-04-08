@@ -1,0 +1,144 @@
+{
+  "timestamp": "2026-04-06T08:37:45.966852",
+  "python": "3.11.10 (main, Sep  7 2024, 18:35:41) [GCC 11.4.0]",
+  "platform": "Linux-6.8.0-90-generic-x86_64-with-glibc2.35",
+  "git_commit": "8bebfd06d0a5d4a79072c4ade930e42083fc1cd4",
+  "pip_freeze": [
+    "alembic==1.18.4",
+    "annotated-doc==0.0.4",
+    "annotated-types==0.7.0",
+    "anyio==4.13.0",
+    "certifi==2026.2.25",
+    "charset-normalizer==3.4.7",
+    "click==8.3.2",
+    "colorlog==6.10.1",
+    "contourpy==1.3.3",
+    "cycler==0.12.1",
+    "distro==1.9.0",
+    "exmol==3.3.0",
+    "fonttools==4.62.1",
+    "greenlet==3.3.2",
+    "h11==0.16.0",
+    "hergbench==0.1.0",
+    "-e git+https://github.com/hsreedeth/hERGBench.git@8bebfd06d0a5d4a79072c4ade930e42083fc1cd4#egg=hergbench_tdc",
+    "httpcore==1.0.9",
+    "httpx==0.28.1",
+    "idna==3.11",
+    "importlib_resources==6.5.2",
+    "jiter==0.13.0",
+    "joblib==1.5.3",
+    "kiwisolver==1.5.0",
+    "Mako==1.3.10",
+    "markdown-it-py==4.0.0",
+    "MarkupSafe==3.0.3",
+    "matplotlib==3.10.8",
+    "mdurl==0.1.2",
+    "narwhals==2.18.1",
+    "numpy==2.4.4",
+    "nvidia-nccl-cu12==2.29.7",
+    "openai==2.30.0",
+    "optuna==4.8.0",
+    "packaging==26.0",
+    "pandas==3.0.2",
+    "pillow==12.2.0",
+    "plotly==6.6.0",
+    "pydantic==2.12.5",
+    "pydantic_core==2.41.5",
+    "Pygments==2.20.0",
+    "pyparsing==3.3.2",
+    "python-dateutil==2.9.0.post0",
+    "PyYAML==6.0.3",
+    "ratelimit==2.2.1",
+    "rdkit==2026.3.1",
+    "requests==2.33.1",
+    "rich==14.3.3",
+    "scikit-learn==1.8.0",
+    "scipy==1.17.1",
+    "selfies==2.2.0",
+    "shellingham==1.5.4",
+    "six==1.17.0",
+    "skunk==1.3.0",
+    "sniffio==1.3.1",
+    "SQLAlchemy==2.0.49",
+    "synspace==1.0.0",
+    "threadpoolctl==3.6.0",
+    "tqdm==4.67.3",
+    "typer==0.24.1",
+    "typing-inspection==0.4.2",
+    "typing_extensions==4.15.0",
+    "urllib3==2.6.3",
+    "xgboost==3.2.0"
+  ],
+  "config": {
+    "project": {
+      "project_name": "hergbench",
+      "run_name": "stage1_chembl_predictions"
+    },
+    "repro": {
+      "seed": 42
+    },
+    "paths": {
+      "data_raw": "data/chembl/raw",
+      "data_processed": "data/chembl/processed",
+      "data_splits": "data/chembl/splits",
+      "reports_root": "reports",
+      "runs_root": "reports/runs"
+    },
+    "logging": {
+      "level": "INFO"
+    },
+    "stage1": {
+      "dataset": {
+        "tdc_task": "Tox",
+        "name": "hERG",
+        "smiles_col": "Drug",
+        "label_col": "Y"
+      },
+      "splits": {
+        "types": [
+          "random",
+          "scaffold",
+          "cluster"
+        ],
+        "frac_train": 0.8,
+        "frac_val": 0.1,
+        "frac_test": 0.1,
+        "seeds": [
+          11,
+          22,
+          33,
+          44,
+          55
+        ],
+        "butina_cutoff": 0.6,
+        "force_resplit": false
+      },
+      "features": {
+        "radius": 2,
+        "n_bits": 2048
+      },
+      "model": {
+        "objective": "aucpr",
+        "optuna_trials": 75,
+        "early_stopping_rounds": 50,
+        "max_estimators": 4000
+      },
+      "calibration": {
+        "method": "isotonic",
+        "threshold_metric": "youden",
+        "n_bins": 10
+      },
+      "eval": {
+        "bootstrap_B": 200,
+        "bins": [
+          0.3,
+          0.5,
+          0.7
+        ]
+      },
+      "counterfactuals": {
+        "enable": false
+      }
+    }
+  }
+}
