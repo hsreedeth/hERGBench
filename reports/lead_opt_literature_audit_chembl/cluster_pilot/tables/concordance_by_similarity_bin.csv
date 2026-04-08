@@ -1,5 +1,5 @@
 parent_similarity_bin,n_parents,n_candidates,fraction_tier1,fraction_scaffold_preserved,mean_concordance_score,median_concordance_score,fraction_lowering_logp,fraction_reducing_aromaticity,fraction_reducing_rotatable_bonds,fraction_reducing_cationic_burden_proxy,fraction_literature_concordant_overall
 <0.3,0.0,0.0,,,,,,,,,
 0.3-0.5,0.0,0.0,,,,,,,,,
-0.5-0.7,1.0,1.0,1.0,1.0,3.0,3.0,1.0,1.0,0.0,0.0,1.0
->0.7,0.0,0.0,,,,,,,,,
+0.5-0.7,4.0,4.0,1.0,1.0,2.0,2.0,1.0,0.5,0.0,0.0,0.25
+>0.7,5.0,5.0,1.0,1.0,2.0,2.0,1.0,0.0,0.4,0.0,0.0

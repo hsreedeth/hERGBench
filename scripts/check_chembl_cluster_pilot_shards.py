@@ -61,7 +61,8 @@ def _write_outputs(pilot_root: Path, status: dict[str, Any]) -> tuple[Path, Path
         f"- Full panel size: `{status['full_panel_size']}`",
         f"- Main merged completed parents: `{status['main_completed_count']}`",
         f"- Unique completed parents across shards: `{status['unique_shard_completed_count']}`",
-        f"- Remaining incomplete parents: `{status['remaining_incomplete_count']}`",
+        f"- Remaining incomplete parents after shard completion: `{status['remaining_incomplete_count']}`",
+        f"- Remaining unmerged parents in main root: `{status['remaining_unmerged_count']}`",
         "",
         "## Main pilot root",
         "",
@@ -134,7 +135,8 @@ def build_status(pilot_root: Path) -> dict[str, Any]:
         if len(shard_names) > 1
     }
     main_ids = sorted(main_reports)
-    remaining = [mol_id for mol_id in full_panel_ids if mol_id not in main_reports]
+    remaining_after_shards = [mol_id for mol_id in full_panel_ids if mol_id not in shard_completed_union]
+    remaining_unmerged = [mol_id for mol_id in full_panel_ids if mol_id not in main_reports]
 
     status = {
         "pilot_root": str(pilot_root.resolve()),
@@ -144,8 +146,12 @@ def build_status(pilot_root: Path) -> dict[str, Any]:
         "main_completed_parent_ids": main_ids,
         "unique_shard_completed_count": len(shard_completed_union),
         "unique_shard_completed_parent_ids": sorted(shard_completed_union),
-        "remaining_incomplete_count": len(remaining),
-        "remaining_incomplete_parent_ids": remaining,
+        # This is the operationally relevant count while shard jobs are active.
+        "remaining_incomplete_count": len(remaining_after_shards),
+        "remaining_incomplete_parent_ids": remaining_after_shards,
+        # This tracks merge lag between shard outputs and the main pilot root.
+        "remaining_unmerged_count": len(remaining_unmerged),
+        "remaining_unmerged_parent_ids": remaining_unmerged,
         "duplicate_completed_parents_across_shards": duplicate_completions,
         "duplicate_audit_partial_dir": (
             str((pilot_root / "audit_partial_b0507").resolve())
@@ -183,6 +189,7 @@ def main() -> int:
     print(f"  - main_completed_count: {status['main_completed_count']}")
     print(f"  - unique_shard_completed_count: {status['unique_shard_completed_count']}")
     print(f"  - remaining_incomplete_count: {status['remaining_incomplete_count']}")
+    print(f"  - remaining_unmerged_count: {status['remaining_unmerged_count']}")
     print(f"  - main_completed_parent_ids: {status['main_completed_parent_ids']}")
     for shard_name in sorted(status["shards"]):
         shard = status["shards"][shard_name]

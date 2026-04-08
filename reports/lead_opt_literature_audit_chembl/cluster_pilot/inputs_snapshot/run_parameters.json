@@ -8,9 +8,9 @@
   "include_dataset_analogues": false,
   "min_similarity_to_parent": null,
   "top_n_per_parent": 0,
-  "join_parent_novelty_from": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/inputs_snapshot/chembl_cluster_pilot_parent_panel.csv",
-  "parent_panel_file": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/inputs_snapshot/chembl_cluster_pilot_parent_panel.csv",
+  "join_parent_novelty_from": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/inputs_snapshot/chembl_cluster_pilot_parent_panel.csv",
+  "parent_panel_file": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/inputs_snapshot/chembl_cluster_pilot_parent_panel.csv",
   "max_parents": null,
-  "workers": 1,
+  "workers": 6,
   "chunk_size": 64
 }
