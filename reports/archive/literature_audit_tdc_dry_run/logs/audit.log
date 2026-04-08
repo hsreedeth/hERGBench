@@ -1,0 +1,21 @@
+2026-04-08 02:36:52,067 INFO Input run directory: /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/runs/2026-03-31_160747_seed42_stage1_signoff
+2026-04-08 02:36:52,068 INFO Lead reports directory: /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/runs/2026-03-31_160747_seed42_stage1_signoff/lead_reports
+2026-04-08 02:36:52,069 INFO Run metadata: /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/runs/2026-03-31_160747_seed42_stage1_signoff/metadata.json
+2026-04-08 02:36:52,141 INFO Dataset label used: tdc
+2026-04-08 02:36:52,142 INFO Report files loaded: 30
+2026-04-08 02:36:52,142 INFO Raw candidate rows parsed: 221
+2026-04-08 02:36:52,143 INFO Prediction context file: /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/runs/2026-03-31_160747_seed42_stage1_signoff/predictions/test_preds_cluster_seed11_with_sim.csv
+2026-04-08 02:36:52,143 INFO Prediction context file: /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/runs/2026-03-31_160747_seed42_stage1_signoff/predictions/test_preds_random_seed11_with_sim.csv
+2026-04-08 02:36:52,144 INFO Prediction context file: /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/runs/2026-03-31_160747_seed42_stage1_signoff/predictions/test_preds_scaffold_seed11_with_sim.csv
+2026-04-08 02:36:54,534 INFO Candidates after analysis filters: 5
+2026-04-08 02:36:54,535 INFO Best-per-parent rows: 3
+2026-04-08 02:36:54,536 INFO Summary cohort rows: 3 (best-per-parent)
+2026-04-08 02:36:54,537 INFO Filter count loaded_candidates=221
+2026-04-08 02:36:54,538 INFO Filter count excluded_dataset_analogues=86
+2026-04-08 02:36:54,539 INFO Filter count excluded_tier4=130
+2026-04-08 02:36:54,539 INFO Filter count excluded_relaxed=0
+2026-04-08 02:36:54,541 INFO Filter count excluded_split_type=0
+2026-04-08 02:36:54,542 INFO Filter count excluded_similarity_to_parent=0
+2026-04-08 02:36:54,543 INFO Filter count excluded_non_scaffold_preserved=0
+2026-04-08 02:36:54,544 INFO Filter count excluded_by_top_n=0
+2026-04-08 02:36:54,545 INFO Filter count remaining_candidates=5

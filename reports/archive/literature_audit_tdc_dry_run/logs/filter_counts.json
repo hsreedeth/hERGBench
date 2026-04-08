@@ -1,0 +1,11 @@
+{
+  "loaded_candidates": 221,
+  "excluded_dataset_analogues": 86,
+  "excluded_tier4": 130,
+  "excluded_relaxed": 0,
+  "excluded_split_type": 0,
+  "excluded_similarity_to_parent": 0,
+  "excluded_non_scaffold_preserved": 0,
+  "excluded_by_top_n": 0,
+  "remaining_candidates": 5
+}

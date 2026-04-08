@@ -1,0 +1,18 @@
+{
+  "input_root": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/runs/2026-03-31_160747_seed42_stage1_signoff",
+  "run_dir": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/runs/2026-03-31_160747_seed42_stage1_signoff",
+  "lead_reports_dir": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/runs/2026-03-31_160747_seed42_stage1_signoff/lead_reports",
+  "metadata_path": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/runs/2026-03-31_160747_seed42_stage1_signoff/metadata.json",
+  "prediction_files": [
+    "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/runs/2026-03-31_160747_seed42_stage1_signoff/predictions/test_preds_cluster_seed11_with_sim.csv",
+    "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/runs/2026-03-31_160747_seed42_stage1_signoff/predictions/test_preds_random_seed11_with_sim.csv",
+    "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/runs/2026-03-31_160747_seed42_stage1_signoff/predictions/test_preds_scaffold_seed11_with_sim.csv"
+  ],
+  "dataset": "tdc",
+  "report_count": 30,
+  "warnings": [],
+  "notes": [
+    "The current serialized field `similarity_to_train` in lead-opt report.json counterfactual records is interpreted here as candidate-to-parent similarity, not train-set similarity."
+  ],
+  "join_parent_novelty_from": null
+}
