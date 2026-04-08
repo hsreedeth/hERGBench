@@ -16,6 +16,8 @@ __pycache__/
 reports/runs
 reports/lead_reports
 reports/analysis/probability_compression
+reports/lead_opt_literature_audit_chembl/
+
 
 # OS
 .DS_Store
