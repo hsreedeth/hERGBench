@@ -1,14 +1,129 @@
 {
   "conflicts": [],
   "consistency": {
-    "main_completed_count": 1,
+    "main_completed_count": 20,
     "main_covers_all_completed_shard_reports": true,
-    "unique_completed_across_shards": 1
+    "unique_completed_across_shards": 20
   },
-  "copied": [],
+  "copied": [
+    {
+      "destination_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/lead_reports/32b0f4dc11d720f6d562a905d73c461574baf552",
+      "mol_id": "32b0f4dc11d720f6d562a905d73c461574baf552",
+      "shard": "b0305",
+      "source_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/b0305/generation/run/lead_reports/32b0f4dc11d720f6d562a905d73c461574baf552"
+    },
+    {
+      "destination_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/lead_reports/637679562b622db5d3e779df2b670d634e37618d",
+      "mol_id": "637679562b622db5d3e779df2b670d634e37618d",
+      "shard": "b0305",
+      "source_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/b0305/generation/run/lead_reports/637679562b622db5d3e779df2b670d634e37618d"
+    },
+    {
+      "destination_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/lead_reports/bc119b6e181cb262689f3789e09ebd2d7fe97cc6",
+      "mol_id": "bc119b6e181cb262689f3789e09ebd2d7fe97cc6",
+      "shard": "b0305",
+      "source_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/b0305/generation/run/lead_reports/bc119b6e181cb262689f3789e09ebd2d7fe97cc6"
+    },
+    {
+      "destination_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/lead_reports/f1e739712c4f137b4f35c4a464d73a86510c2f4b",
+      "mol_id": "f1e739712c4f137b4f35c4a464d73a86510c2f4b",
+      "shard": "b0305",
+      "source_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/b0305/generation/run/lead_reports/f1e739712c4f137b4f35c4a464d73a86510c2f4b"
+    },
+    {
+      "destination_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/lead_reports/f9b723494f62a056148857a25337c48eaa4638ef",
+      "mol_id": "f9b723494f62a056148857a25337c48eaa4638ef",
+      "shard": "b0305",
+      "source_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/b0305/generation/run/lead_reports/f9b723494f62a056148857a25337c48eaa4638ef"
+    },
+    {
+      "destination_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/lead_reports/0af869741c2c90b24b129daa70ac5d88e63f5269",
+      "mol_id": "0af869741c2c90b24b129daa70ac5d88e63f5269",
+      "shard": "b0507",
+      "source_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/b0507/generation/run/lead_reports/0af869741c2c90b24b129daa70ac5d88e63f5269"
+    },
+    {
+      "destination_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/lead_reports/0f56b05bdc40933c25003dc7a17eb6abdb77d1e9",
+      "mol_id": "0f56b05bdc40933c25003dc7a17eb6abdb77d1e9",
+      "shard": "b0507",
+      "source_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/b0507/generation/run/lead_reports/0f56b05bdc40933c25003dc7a17eb6abdb77d1e9"
+    },
+    {
+      "destination_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/lead_reports/28ab133eb0cab0600a71e8011ffa8cb59006af6e",
+      "mol_id": "28ab133eb0cab0600a71e8011ffa8cb59006af6e",
+      "shard": "b0507",
+      "source_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/b0507/generation/run/lead_reports/28ab133eb0cab0600a71e8011ffa8cb59006af6e"
+    },
+    {
+      "destination_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/lead_reports/bedb61b76375e97d9de140e8a85defc38b36e6ec",
+      "mol_id": "bedb61b76375e97d9de140e8a85defc38b36e6ec",
+      "shard": "b0507",
+      "source_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/b0507/generation/run/lead_reports/bedb61b76375e97d9de140e8a85defc38b36e6ec"
+    },
+    {
+      "destination_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/lead_reports/527ee3e0a48b385d795ee738fd1037a5b6cdcfe5",
+      "mol_id": "527ee3e0a48b385d795ee738fd1037a5b6cdcfe5",
+      "shard": "gt07",
+      "source_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/gt07/generation/run/lead_reports/527ee3e0a48b385d795ee738fd1037a5b6cdcfe5"
+    },
+    {
+      "destination_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/lead_reports/6d8bb92d758e8206cf47eef14306472e5a43b556",
+      "mol_id": "6d8bb92d758e8206cf47eef14306472e5a43b556",
+      "shard": "gt07",
+      "source_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/gt07/generation/run/lead_reports/6d8bb92d758e8206cf47eef14306472e5a43b556"
+    },
+    {
+      "destination_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/lead_reports/6eb82aa716e9aaeb464acf80ea5156b15a44f160",
+      "mol_id": "6eb82aa716e9aaeb464acf80ea5156b15a44f160",
+      "shard": "gt07",
+      "source_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/gt07/generation/run/lead_reports/6eb82aa716e9aaeb464acf80ea5156b15a44f160"
+    },
+    {
+      "destination_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/lead_reports/8c0230bad0126918fc2bea5c36e0ab5c09c59b30",
+      "mol_id": "8c0230bad0126918fc2bea5c36e0ab5c09c59b30",
+      "shard": "gt07",
+      "source_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/gt07/generation/run/lead_reports/8c0230bad0126918fc2bea5c36e0ab5c09c59b30"
+    },
+    {
+      "destination_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/lead_reports/c9d5fe643178cae91655a380b086635ed528f4f6",
+      "mol_id": "c9d5fe643178cae91655a380b086635ed528f4f6",
+      "shard": "gt07",
+      "source_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/gt07/generation/run/lead_reports/c9d5fe643178cae91655a380b086635ed528f4f6"
+    },
+    {
+      "destination_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/lead_reports/6dccdc2a597b0cc6a47a610c20ceb29232c73608",
+      "mol_id": "6dccdc2a597b0cc6a47a610c20ceb29232c73608",
+      "shard": "lt03",
+      "source_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/lt03/generation/run/lead_reports/6dccdc2a597b0cc6a47a610c20ceb29232c73608"
+    },
+    {
+      "destination_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/lead_reports/86fcc24492f4309bcb809ceb104d043f0175ba1b",
+      "mol_id": "86fcc24492f4309bcb809ceb104d043f0175ba1b",
+      "shard": "lt03",
+      "source_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/lt03/generation/run/lead_reports/86fcc24492f4309bcb809ceb104d043f0175ba1b"
+    },
+    {
+      "destination_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/lead_reports/b53d5d72d6a789017275eb7570a60c2fbb91feb8",
+      "mol_id": "b53d5d72d6a789017275eb7570a60c2fbb91feb8",
+      "shard": "lt03",
+      "source_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/lt03/generation/run/lead_reports/b53d5d72d6a789017275eb7570a60c2fbb91feb8"
+    },
+    {
+      "destination_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/lead_reports/cb5c22de0ccdcf673936f4c8d07dfbd3f9a4aebb",
+      "mol_id": "cb5c22de0ccdcf673936f4c8d07dfbd3f9a4aebb",
+      "shard": "lt03",
+      "source_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/lt03/generation/run/lead_reports/cb5c22de0ccdcf673936f4c8d07dfbd3f9a4aebb"
+    },
+    {
+      "destination_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/generation/run/lead_reports/fed009dbfb11625a971ea56dc6327d725e225cf5",
+      "mol_id": "fed009dbfb11625a971ea56dc6327d725e225cf5",
+      "shard": "lt03",
+      "source_dir": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/shards/lt03/generation/run/lead_reports/fed009dbfb11625a971ea56dc6327d725e225cf5"
+    }
+  ],
   "dry_run": false,
   "ignored_incomplete": [],
-  "pilot_root": "/Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot",
+  "pilot_root": "/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot",
   "skipped_existing": [
     {
       "action": "already_merged_identical",

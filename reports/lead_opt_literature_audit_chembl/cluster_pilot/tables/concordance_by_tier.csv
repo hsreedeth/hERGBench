@@ -1,2 +1,2 @@
 tier_num,tier_label,n_parents,n_candidates,fraction_scaffold_preserved,mean_concordance_score,median_concordance_score,fraction_literature_concordant_overall
-1,Tier 1 — Flip,9,9,1.0,2.0,2.0,0.1111111111111111
+1,Tier 1 — Flip,9,9,1.0,2.111111111111111,2.0,0.3333333333333333

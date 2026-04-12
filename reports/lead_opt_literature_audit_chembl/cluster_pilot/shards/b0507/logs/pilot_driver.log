@@ -7,3 +7,13 @@
 [2026-04-08 11:42:41,928] INFO -   model bundle: /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/reports/stage1_chembl/reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions/models/model_cluster_seed11.joblib
 [2026-04-08 11:42:41,930] INFO -   split CSV: /Users/harisreedeth/Desktop/Ogoing.hERGBench/hERGBench/data/chembl/splits/cluster_seed11.csv
 [2026-04-08 11:42:41,931] INFO - Metadata: dataset=chembl split=cluster seed=11 threshold=0.710
+[2026-04-11 10:39:12,658] INFO - Selected ChEMBL source run: /workspace/hERGBench/reports/stage1_chembl/reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions
+[2026-04-11 10:39:12,659] INFO - Multiple valid ChEMBL source runs found; selected the most recent run directory by timestamped name.
+[2026-04-11 10:39:12,660] INFO - Chosen source run directory: /workspace/hERGBench/reports/stage1_chembl/reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions
+[2026-04-11 10:39:12,661] INFO - Source files for panel construction:
+[2026-04-11 10:39:12,661] INFO -   predictions with similarity: /workspace/hERGBench/reports/stage1_chembl/reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions/predictions/test_preds_cluster_seed11_with_sim.csv
+[2026-04-11 10:39:12,662] INFO -   raw test predictions: /workspace/hERGBench/reports/stage1_chembl/reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions/predictions/test_preds_cluster_seed11.csv
+[2026-04-11 10:39:12,662] INFO -   model metadata: /workspace/hERGBench/reports/stage1_chembl/reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions/models/model_meta_cluster_seed11.json
+[2026-04-11 10:39:12,663] INFO -   model bundle: /workspace/hERGBench/reports/stage1_chembl/reports/runs/2026-04-06_083745_seed42_stage1_chembl_predictions/models/model_cluster_seed11.joblib
+[2026-04-11 10:39:12,663] INFO -   split CSV: /workspace/hERGBench/data/chembl/splits/cluster_seed11.csv
+[2026-04-11 10:39:12,664] INFO - Metadata: dataset=chembl split=cluster seed=11 threshold=0.710

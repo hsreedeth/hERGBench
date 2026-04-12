@@ -1,16 +1,16 @@
 Lead Optimization Literature-Concordant Counterfactual Audit
 
 Parents analyzed: 9
-Candidates in candidate-level table: 29
+Candidates in candidate-level table: 30
 Candidates in summary cohort: 9
 Tiers included: Tier 1-3 only
 Summary cohort mode: best candidate per parent
 
 Scaffold-preserved candidates in summary cohort: 100.0% (common).
-Medicinal locality flag rate: 100.0%. Overall literature-concordant rate: 11.1%.
-Most common literature-concordant direction: lower logP (100.0%).
+Medicinal locality flag rate: 100.0%. Overall literature-concordant rate: 33.3%.
+Most common literature-concordant direction: lower logP (88.9%).
 Least common literature-concordant direction: reduce cationic burden proxy (0.0%).
-Tier summary: Tier 1 — Flip: n=9, concordant=11.1%.
+Tier summary: Tier 1 — Flip: n=9, concordant=33.3%.
 
 Assumptions and boundaries:
 - The current serialized field `similarity_to_train` in lead-opt report.json counterfactual records is interpreted here as candidate-to-parent similarity, not train-set similarity.

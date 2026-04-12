@@ -2,13 +2,14 @@
 
 - Pilot root: `/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot`
 - Full panel size: `20`
-- Main merged completed parents: `1`
+- Main merged completed parents: `20`
 - Unique completed parents across shards: `20`
-- Remaining incomplete parents: `19`
+- Remaining incomplete parents after shard completion: `0`
+- Remaining unmerged parents in main root: `0`
 
 ## Main pilot root
 
-- Completed parent ids: `a20f74e3f8ebfea51b2477906e00b06b1ca1e4b7`
+- Completed parent ids: `0af869741c2c90b24b129daa70ac5d88e63f5269, 0f56b05bdc40933c25003dc7a17eb6abdb77d1e9, 28ab133eb0cab0600a71e8011ffa8cb59006af6e, 32b0f4dc11d720f6d562a905d73c461574baf552, 527ee3e0a48b385d795ee738fd1037a5b6cdcfe5, 637679562b622db5d3e779df2b670d634e37618d, 6d8bb92d758e8206cf47eef14306472e5a43b556, 6dccdc2a597b0cc6a47a610c20ceb29232c73608, 6eb82aa716e9aaeb464acf80ea5156b15a44f160, 86fcc24492f4309bcb809ceb104d043f0175ba1b, 8c0230bad0126918fc2bea5c36e0ab5c09c59b30, a20f74e3f8ebfea51b2477906e00b06b1ca1e4b7, b53d5d72d6a789017275eb7570a60c2fbb91feb8, bc119b6e181cb262689f3789e09ebd2d7fe97cc6, bedb61b76375e97d9de140e8a85defc38b36e6ec, c9d5fe643178cae91655a380b086635ed528f4f6, cb5c22de0ccdcf673936f4c8d07dfbd3f9a4aebb, f1e739712c4f137b4f35c4a464d73a86510c2f4b, f9b723494f62a056148857a25337c48eaa4638ef, fed009dbfb11625a971ea56dc6327d725e225cf5`
 - Stale duplicate audit subtree present: `/workspace/hERGBench/reports/lead_opt_literature_audit_chembl/cluster_pilot/audit_partial_b0507`
 
 ## Shards
