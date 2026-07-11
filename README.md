@@ -6,6 +6,7 @@
 
 ## Mini abstract
 
-We Can we reliably flag hERG liability before synthesis, even when chemistry gets harder?
+
+Can we reliably flag hERG liability before synthesis, even when chemistry gets harder?
 
 
