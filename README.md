@@ -6,6 +6,6 @@
 
 ## Mini abstract
 
-We built hERGBench to answer one high-impact question: can we reliably flag hERG liability before synthesis, even when chemistry gets harder?
+We Can we reliably flag hERG liability before synthesis, even when chemistry gets harder?
 
 
