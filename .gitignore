@@ -1,28 +1,56 @@
 
-# python
+# Python bytecode and tool caches
 __pycache__/
-*.pyc 
+*.py[cod]
+*$py.class
 .ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Local environments and build products
 .venv/
+venv/
+env/
+.tox/
+.nox/
 .env
+build/
+dist/
+*.egg-info/
 
 # Conda
 *.conda
 *.conda-lock
 
-# data related.
-# data/raw
-# data/processed
-reports/runs
-reports/lead_reports
-reports/analysis/probability_compression
-reports/lead_opt_literature_audit_chembl/
+# High-volume generated workspaces. Existing tracked scientific runs remain
+# tracked; promote new canonical outputs intentionally with their manifests.
+/reports/runs/
+/reports/lead_reports/
+/reports/analysis/probability_compression/
+/reports/lead_opt_literature_audit_chembl/
+/reports/stage2_exports/
+/stage2_export_*/
 
 
-# OS
+# Process-local and transient runtime files
+*.pid
+nohup.out
+
+# OS and editor metadata
 .DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+.claude/settings.local.json
 
-# General Logs. (refer to obsidian notes for detailed breakdowns.)
+# Local development notes (historical tracked copies remain tracked)
 notes.txt
 explanation_tutorial_notes.txt
 gitcomms.txt
@@ -30,7 +58,6 @@ technical.md
 stage1_schematic.md
 hERGBench_Project_Abstract.tex
 
-# Can choose to include data_splits later (it is reproducibility-critical) for now data arw and processed are ignored.
-
-# generated archives
+# Generated packaged artifacts. Scientific tables, figures, manifests, and
+# provenance text are intentionally not ignored.
 *.tar.gz

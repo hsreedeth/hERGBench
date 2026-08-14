@@ -1,6 +1,0 @@
-smiles,label,max_sim_to_train,ad_bin,report_found,best_tier_num,best_tier_label,tier123_success,n_survivors_total,n_survivors_tier123,median_cf_similarity,median_delta_p,min_p
-CCCc1nc(C)c2c(=O)[nH]c(-c3cc(S(=O)(=O)N4CC[NH+](CC)CC4)ccc3OCC)nn12,1,0.1875,<0.3,True,4,diagnostic_close_edits,False,5,0,,,
-O=C(c1ccccc1F)c1ccccc1F,0,0.217391304347826,<0.3,True,4,diagnostic_close_edits,False,5,0,,,
-C#C[C@]1(O)CC[C@H]2[C@@H]3CCC4=Cc5oncc5C[C@]4(C)[C@H]3CC[C@@]21C,0,0.2375,<0.3,True,4,diagnostic_close_edits,False,5,0,,,
-O=C1N(Cc2ccccc2)[C@@H]2[C@H]3CCC[S+]3C[C@@H]2N1Cc1ccccc1,1,0.2394366197183098,<0.3,True,4,diagnostic_close_edits,False,1,0,,,
-CNS(=O)(=O)Cc1ccc2[nH]cc(CC[NH+](C)C)c2c1,0,0.2459016393442623,<0.3,True,4,diagnostic_close_edits,False,5,0,,,

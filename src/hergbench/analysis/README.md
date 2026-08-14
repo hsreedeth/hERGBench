@@ -1,9 +1,23 @@
-# hergbench.analysis
+# `hergbench.analysis`
 
-Analytical layer for the calibration-thesis paper. Consumes frozen Stage 1/2 outputs.
+Active analysis layer for repeated benchmarks, applicability-domain analysis,
+calibration, and paper figures. These modules consume frozen data/split inputs
+and versioned Stage 1/2 outputs.
 
 ## Modules
 
-- **panel_builder.py** — Builds stratified 30-compound lead panels for counterfactual evaluation. Replaces the legacy make_stage1_panel.py flat selection.
-- **multiseed_benchmark.py** — Runs Stage 1 benchmarks across all 5 seeds (11–55) per split type and aggregates AD-binned metrics with confidence intervals.
-- **calibration_by_bin.py** — (Upcoming) Tanimoto-binned calibration vs discrimination analysis. Central figure generator for the paper.
+- `multiseed_benchmark.py` runs ECFP4-XGBoost over five seeds and three split
+  types, then aggregates similarity-binned metrics.
+- `stage2_multiseed_runner.py` runs or loads manifest-linked ChemProp D-MPNN
+  experiments and aggregates their applicability-domain tables.
+- `calibration_by_bin.py` builds the canonical cross-model AD-bin, weighted
+  overall, and equal-bin macro summaries.
+- `calibrate_stage2.py` performs post-hoc Stage 2 calibration and retains raw
+  and aggregated calibrated outputs.
+- `paper_figures.py` renders the current comparison, reliability, and
+  calibration figures from versioned result tables.
+- `panel_builder.py` builds novelty/risk-stratified compound panels for
+  counterfactual evaluation.
+
+Canonical result paths and seed semantics are documented in
+`docs/result_provenance.md`; do not select an input solely by filename.
