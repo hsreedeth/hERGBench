@@ -1,0 +1,53 @@
+hergbench_stage1_signoff/
+├── MANIFEST.sha256                 # Hashes for recorded files.
+├── PROVENANCE.txt                  # Provenance and origin notes.
+├── SIGNOFF.md                      # Stage 1 signoff document.
+├── SIGNOFF_NOTE.txt                # Additional signoff notes.
+├── .DS_Store                       # macOS Finder metadata.
+│
+├── conifg/
+│   ├── stage1_reference.yaml       # Reference run config for Stage 1.
+│   └── .DS_Store                   # macOS Finder metadata.
+│
+├── environment/
+│   ├── git_commit.txt              # Git commit hash at run time.
+│   ├── git_status_porcelain.txt    # Clean/dirty repo snapshot.
+│   ├── pip_freeze.txt              # Python package versions.
+│   └── python_version.txt          # Python runtime version.
+│
+├── inputs/
+│   ├── .DS_Store                   # macOS Finder metadata.
+│   ├── benchmarks/
+│   │   └── benchmark_results.csv   # Reference benchmark results.
+│   ├── panel/
+│   │   ├── panel.csv               # Panel used for evaluation.
+│   │   ├── panel__.csv             # Alternate panel export.
+│   │   └── .DS_Store               # macOS Finder metadata.
+│   ├── reference_run.txt           # Reference run descriptor.
+│   ├── reports/
+│   │   ├── runs/                   # Run report bundle directory.
+│   │   └── .DS_Store               # macOS Finder metadata.
+│   └── splits/
+│       ├── candidates_notrain.csv  # Excluded candidates list.
+│       ├── cluster_seed11.csv      # Cluster split indices.
+│       └── train_frame.csv         # Training frame indices.
+│
+├── models_calibrators/
+│   ├── model_cluster_seed11.joblib # Trained model artifact.
+│   └── model_meta_cluster_seed11.json # Model metadata and thresholds.
+│
+└── outputs/
+    ├── .DS_Store                   # macOS Finder metadata.
+    ├── diagnostics/
+    │   ├── diagnostic_summary.txt  # Summary diagnostics.
+    │   └── per_molecule_diagnostics.csv # Per-molecule diagnostics.
+    ├── failure_analysis/
+    │   ├── .DS_Store               # macOS Finder metadata.
+    │   ├── representative_failures/ # Example failure folders.
+    │   ├── selected_failures.csv   # Selected failure cases.
+    │   └── tier4_attrition.csv     # Tier 4 attrition breakdown.
+    └── metrics/
+        ├── .DS_Store               # macOS Finder metadata.
+        ├── benchmark_summary.csv   # Benchmark summary metrics.
+        ├── yield_matrix.csv        # Yield matrix by AD bin.
+        └── yield_summary_by_ad_bin.csv # Yield summary by AD bin.

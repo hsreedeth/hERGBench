@@ -1,0 +1,48 @@
+stage: 2
+run_name: stage2_chemprop_chembl_cluster_seed55_torch42
+data:
+  path: data/chembl/processed/chembl_herg_clean.csv
+  smiles_col: smiles
+  target_col: y
+  sha256: null
+splits:
+  membership_path: data/chembl/splits/cluster_seed55.csv
+  join_key: mol_id
+  split_col: split
+chemprop:
+  task_type: classification
+  metrics:
+  - prc
+  - roc
+  tracking_metric: auroc
+  epochs: 80
+  patience: 10
+  batch_size: 64
+  num_workers: 4
+  message_hidden_dim: 300
+  depth: 3
+  dropout: 0.0
+  init_lr: 0.0001
+  max_lr: 0.001
+  final_lr: 0.0001
+  warmup_epochs: 2
+  data_seed: 42
+  pytorch_seed: 42
+  accelerator: cuda
+  devices: 1
+calibration:
+  enabled: true
+  method: none
+  threshold_metric: youden
+  n_bins: 10
+evaluation:
+  ad_bins:
+  - 0.3
+  - 0.5
+  - 0.7
+  fp_radius: 2
+  fp_n_bits: 2048
+  boostrap_B: 2000
+reporting:
+  run_root: reports/runs
+  save_preds: true

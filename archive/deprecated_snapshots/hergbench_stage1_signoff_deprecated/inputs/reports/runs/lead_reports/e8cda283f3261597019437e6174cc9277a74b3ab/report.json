@@ -1,0 +1,151 @@
+{
+  "base_smiles_raw": "COc1ccc2c(c1)[C@]13CCCC[C@@H]1[C@H](C2)N(C)CC3",
+  "base_smiles_std": "COc1ccc2c(c1)[C@]13CCCC[C@@H]1[C@H](C2)N(C)CC3",
+  "cf_summary": {
+    "attempts": [
+      {
+        "counts": {
+          "alert_filtered": 0,
+          "delta_filtered": 0,
+          "delta_min_used": null,
+          "duplicate": 3,
+          "invalid": 0,
+          "kept": 2,
+          "logp_delta_max_used": 1.5,
+          "logp_filtered": 0,
+          "min_tanimoto_source": "min_tanimoto_flip",
+          "min_tanimoto_used": 0.5,
+          "pains_used": true,
+          "prob_filtered": 154,
+          "prob_max_used": 0.509999,
+          "qed_filtered": 0,
+          "qed_min_used": 0.0,
+          "sa_filtered": 0,
+          "sa_max_used": 4.5,
+          "sampled": 1454,
+          "similarity_filtered": 1295
+        },
+        "relaxation": "none",
+        "relaxation_desc": "baseline constraints",
+        "tier": "flip",
+        "tier_label": "Tier 1 \u2014 Flip"
+      }
+    ],
+    "dataset_fallback_count": 5,
+    "dataset_fallback_used": true,
+    "final_best_tier_num": 4,
+    "final_count": 2,
+    "final_count_tier123": 0,
+    "final_count_total": 2,
+    "final_relaxation": "none",
+    "final_relaxation_desc": "baseline constraints",
+    "final_tier": "diagnostic_close_edits",
+    "final_tier_label": "diagnostic_close_edits",
+    "relaxation_used": false,
+    "sample_budget": 1800,
+    "sample_error": null,
+    "sampled": 1454,
+    "scarcity": false,
+    "target_prob_max": 0.509999
+  },
+  "counterfactuals": [
+    {
+      "alert": false,
+      "delta_p_raw": 0.14826183413718863,
+      "delta_p_std": 0.14826183413718863,
+      "logp": 2.7784000000000013,
+      "p_raw": 0.5043281558155339,
+      "p_std": 0.5043281558155339,
+      "qed": 0.7858211453554307,
+      "raw_smiles": "COc1cc2c(cn1)C[C@H]1[C@H]3CCCC[C@@]23CCN1C",
+      "relaxation": "none",
+      "sascore": 4.351385849600616,
+      "similarity_to_train": 0.19753086419753085,
+      "smiles_std": "COc1cc2c(cn1)C[C@H]1[C@H]3CCCC[C@@]23CCN1C",
+      "tier_label_std": "diagnostic_close_edits",
+      "tier_num_std": 4,
+      "tier_raw": "flip"
+    },
+    {
+      "alert": false,
+      "delta_p_raw": 0.14826183413718863,
+      "delta_p_std": 0.14826183413718863,
+      "logp": 2.7784000000000013,
+      "p_raw": 0.5043281558155339,
+      "p_std": 0.5043281558155339,
+      "qed": 0.7858211453554307,
+      "raw_smiles": "COc1cnc2c(c1)[C@]13CCCC[C@@H]1[C@H](C2)N(C)CC3",
+      "relaxation": "none",
+      "sascore": 4.389718210343322,
+      "similarity_to_train": 0.21333333333333335,
+      "smiles_std": "COc1cnc2c(c1)[C@]13CCCC[C@@H]1[C@H](C2)N(C)CC3",
+      "tier_label_std": "diagnostic_close_edits",
+      "tier_num_std": 4,
+      "tier_raw": "flip"
+    }
+  ],
+  "dataset_analogues": [
+    {
+      "actionable": true,
+      "alert": false,
+      "delta_p": 0.2578005451798972,
+      "logp": -1.0397000000000005,
+      "p": 0.39478944477282535,
+      "qed": 0.5624722357827983,
+      "sascore": 2.5435777719868486,
+      "similarity": 0.0967741935483871,
+      "smiles": "Cn1c(=O)c2[nH]cnc2n(C)c1=O"
+    },
+    {
+      "actionable": false,
+      "alert": true,
+      "delta_p": 0.2578005451798972,
+      "logp": 0.5976899999999998,
+      "p": 0.39478944477282535,
+      "qed": 0.5014913838271434,
+      "sascore": 3.3037189467190657,
+      "similarity": 0.030303030303030304,
+      "smiles": "Nc1nc(=S)c2[nH]cnc2[nH]1"
+    },
+    {
+      "actionable": true,
+      "alert": false,
+      "delta_p": 0.2569675023083054,
+      "logp": -1.7524000000000002,
+      "p": 0.39562248764441715,
+      "qed": 0.49374276519904164,
+      "sascore": 2.7864784687640185,
+      "similarity": 0.05,
+      "smiles": "Nc1nnnn1CCO"
+    },
+    {
+      "actionable": false,
+      "alert": true,
+      "delta_p": 0.2569675023083054,
+      "logp": -1.6228999999999996,
+      "p": 0.39562248764441715,
+      "qed": 0.33550580856237117,
+      "sascore": 3.304669862772739,
+      "similarity": 0.034482758620689655,
+      "smiles": "NC(CNO)C(=O)O"
+    },
+    {
+      "actionable": false,
+      "alert": true,
+      "delta_p": 0.2569675023083054,
+      "logp": -0.8561000000000003,
+      "p": 0.39562248764441715,
+      "qed": 0.6318586926732331,
+      "sascore": 2.460960564488465,
+      "similarity": 0.029411764705882353,
+      "smiles": "CC(=O)Nc1nnc(S(N)(=O)=O)s1"
+    }
+  ],
+  "max_sim_to_train": 0.2465753424657534,
+  "mol_id": "e8cda283f3261597019437e6174cc9277a74b3ab",
+  "p_base_raw": 0.6525899899527225,
+  "p_base_std": 0.6525899899527225,
+  "sim_bin": "<0.3",
+  "threshold": 0.51,
+  "y_true": 1
+}
