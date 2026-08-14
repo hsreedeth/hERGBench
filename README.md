@@ -114,7 +114,8 @@ Priorities are paired per-compound or paired-seed inference, external and tempor
 validation, calibration under chemical shift, and prospective testing of
 counterfactual lead-optimisation proposals.
 
-## Citation and author
+
+Can we reliably flag hERG liability before synthesis, even when chemistry gets harder?
 
 Author: **Hari Sreedeth**. A formal paper citation and archival DOI are not yet
 available. Until then, cite the repository name, commit hash, and access date,
