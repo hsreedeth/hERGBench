@@ -17,8 +17,7 @@ benchmarks.
 
 The graph model contributes little additional discrimination in highly familiar
 chemical space, but its relative advantage becomes substantially larger for
-compounds distant from the training chemistry. This is more informative than a
-blanket claim that one architecture is universally better.
+compounds distant from the training chemistry. 
 
 ![ChEMBL AUROC by maximum ECFP4 Tanimoto similarity to the training set, comparing D-MPNN and XGBoost across cluster, random, and scaffold splits.](reports/cross_model_comparison/FIGURE_1.png)
 
